@@ -10,8 +10,8 @@ This repository contains a small Svelte project that allows for connecting a mob
 To get started with the project, clone the repository and install the dependencies:
 
 ```bash
-git clone https://github.com/yourusername/sensor-timeline.git
-cd sensor-timeline
+git clone https://github.com/gsteinLTU/SensorTimeline.git
+cd SensorTimeline
 npm install
 ```
 
@@ -28,7 +28,9 @@ This will start a local development server and open the app in your default brow
 
 Navigate to the app in your browser. If you are hosting the app localhost, it will typically be available at `http://localhost:5173`. The mobile page would then be available at `http://localhost:5173/mobile`.
 
-You will see a QR code that you can scan with your mobile device to connect. Once connected, the app will display real-time sensor data from your mobile device.
+You will see a QR code that you can scan on the mobile page to fill in the ID. Once connected, the app will display real-time sensor data from your mobile device.
+
+Getting the mobile page where it's easy to access is a bit of a challenge. I've been using localtunnel to expose my local server and connecting to it from my phone.
 
 ## License
 This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
