@@ -1,38 +1,34 @@
-# sv
+# Sensor Timeline
+This repository contains a small Svelte project that allows for connecting a mobile phone to a computer and displaying the sensor data.
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+## Features
+- Real-time accelerometer data streaming from mobile to desktop
+- QR code scanning for easy peer connection
+- User-friendly interface built with Svelte
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
+## Getting Started
+To get started with the project, clone the repository and install the dependencies:
 
 ```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+git clone https://github.com/yourusername/sensor-timeline.git
+cd sensor-timeline
+npm install
 ```
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Running the Project
+To run the project in development mode, use the following command:
 
 ```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+This will start a local development server and open the app in your default browser.
 
-To create a production version of your app:
+## Using the App
 
-```bash
-npm run build
-```
+Navigate to the app in your browser. If you are hosting the app localhost, it will typically be available at `http://localhost:5173`. The mobile page would then be available at `http://localhost:5173/mobile`.
 
-You can preview the production build with `npm run preview`.
+You will see a QR code that you can scan with your mobile device to connect. Once connected, the app will display real-time sensor data from your mobile device.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## License
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
