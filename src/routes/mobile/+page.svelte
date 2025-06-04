@@ -14,6 +14,7 @@
     let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
     let streamingInterval: ReturnType<typeof setInterval> | null = null;
     let permissionGranted: boolean = $state(false);
+    let deviceMotionHandler: ((event: DeviceMotionEvent) => void) | null = null;
 
     let otherId: string = $state('');
 
@@ -57,9 +58,9 @@
         console.log('Mobile: Starting accelerometer streaming...');
         isStreaming = true;
 
-        // Listen for device motion events
-        const handleDeviceMotion = (event: DeviceMotionEvent) => {
-            if (event.acceleration && connection) {
+        // Create and store the event handler reference
+        deviceMotionHandler = (event: DeviceMotionEvent) => {
+            if (event.acceleration && connection && isStreaming) {
                 const data = {
                     x: event.acceleration.x || 0,
                     y: event.acceleration.y || 0,
@@ -81,11 +82,11 @@
             }
         };
 
-        window.addEventListener('devicemotion', handleDeviceMotion);
+        window.addEventListener('devicemotion', deviceMotionHandler);
 
         // Also send data at regular intervals (fallback)
         streamingInterval = setInterval(() => {
-            if (accelerometerData && connection) {
+            if (accelerometerData && connection && isStreaming) {
                 try {
                     connection.send(JSON.stringify({
                         type: 'heartbeat',
@@ -103,12 +104,19 @@
         console.log('Mobile: Stopping accelerometer streaming...');
         isStreaming = false;
         
-        window.removeEventListener('devicemotion', () => {});
+        // Remove the actual event listener using the stored reference
+        if (deviceMotionHandler) {
+            window.removeEventListener('devicemotion', deviceMotionHandler);
+            deviceMotionHandler = null;
+        }
         
         if (streamingInterval) {
             clearInterval(streamingInterval);
             streamingInterval = null;
         }
+        
+        // Clear the accelerometer data to stop any residual sending
+        accelerometerData = null;
     }
 
     // Event handlers
