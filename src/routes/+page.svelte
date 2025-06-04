@@ -7,13 +7,24 @@
     import ConnectionForm from "$lib/components/ConnectionForm.svelte";
     import ActionButtons from "$lib/components/ActionButtons.svelte";
 
-    let peer: Peer | null = null;
+    let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
     let peerStatus: string | null = $state(null);
-    let connection: DataConnection | null = null;
+    let connection: DataConnection | null = $state.raw(null);
     let showScanner: boolean = $state(false);
 
     let otherId: string = $state('');
+
+    // Debug effect to track connection state
+    $effect(() => {
+        console.log('Main page - connection state changed:', {
+            connection: !!connection,
+            connectionOpen: connection?.open,
+            peerId,
+            peerStatus,
+            otherId
+        });
+    });
 
     // Event handlers
     function handleIdChange(id: string) {
@@ -22,7 +33,29 @@
 
     function handleConnect() {
         if (peer && otherId) {
-            connection = peer.connect(otherId);
+            console.log('Attempting to connect to:', otherId);
+            const conn = peer.connect(otherId);
+            
+            conn.on('open', () => {
+                console.log('Outgoing connection opened to:', conn.peer);
+                console.log('Connection object:', conn);
+                connection = conn;
+            });
+            
+            conn.on('data', (data) => {
+                console.log('Received data:', data);
+            });
+            
+            conn.on('close', () => {
+                console.log('Outgoing connection closed');
+                connection = null;
+            });
+            
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+            });
+        } else {
+            console.log('Cannot connect: peer or otherId missing', { peer: !!peer, otherId });
         }
     }
 
@@ -40,45 +73,77 @@
     }
 
     function handleSendMessage() {
-        connection?.send('Hello from PeerJS!');
+        console.log('Attempting to send message, connection state:', {
+            connection: !!connection,
+            connectionOpen: connection?.open,
+            connectionType: connection?.type
+        });
+        
+        if (connection) {
+            try {
+                connection.send('Hello from PeerJS!');
+                console.log('Message sent: Hello from PeerJS!');
+            } catch (error) {
+                console.error('Error sending message:', error);
+            }
+        } else {
+            console.log('Cannot send message: no connection');
+        }
     }
 
     function handleDisconnect() {
-        peer?.disconnect();
+        console.log('Desktop: Disconnecting...');
+        
+        if (connection) {
+            connection.close();
+            connection = null;
+        }
+        
+        // Note: Don't disconnect the peer entirely, just close the connection
+        // This allows for reconnection without reinitializing the peer
+        console.log('Desktop: Disconnected, ready for new connections');
     }
 
     // Initialize PeerJS
     if (browser) {
-        peer = new Peer();
+        const newPeer = new Peer();
+        peer = newPeer;
 
-        peer.on('open', id => {
+        newPeer.on('open', id => {
             console.log('Peer ID:', id);
             peerStatus = 'Connected';
             peerId = id;
         });
 
-        peer.on("connection", (conn) => {
+        newPeer.on("connection", (conn) => {
+            console.log('Incoming connection from:', conn.peer);
             connection = conn;
+            
             conn.on("data", (data) => {
-                // Will print 'hi!'
-                console.log(data);
+                console.log('Received data:', data);
             });
+            
             conn.on("open", () => {
+                console.log('Incoming connection opened with:', conn.peer);
                 conn.send("hello!");
             });
+            
             conn.on('close', () => {
-                console.log('Connection closed');
-                peerStatus = 'Disconnected';
+                console.log('Incoming connection closed');
+                connection = null;
             });
-            console.log('Connection established with:', conn.peer);
+            
+            conn.on('error', (err) => {
+                console.error('Incoming connection error:', err);
+            });
         });
         
-        peer.on('close', () => {
+        newPeer.on('close', () => {
             console.log('Connection closed');
             peerStatus = 'Disconnected';
         });
 
-        peer.on('error', (err) => {
+        newPeer.on('error', (err) => {
             console.error('PeerJS error:', err);
         });
     }
