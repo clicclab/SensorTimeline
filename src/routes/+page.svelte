@@ -6,6 +6,8 @@
     import PeerStatus from "$lib/components/PeerStatus.svelte";
     import ConnectionForm from "$lib/components/ConnectionForm.svelte";
     import ActionButtons from "$lib/components/ActionButtons.svelte";
+    import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
+    import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
@@ -301,6 +303,15 @@
                                         <div class="text-green-600 font-medium">Active</div>
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <!-- Real-time Charts -->
+                            <div class="space-y-4">
+                                <!-- Main 3-axis chart -->
+                                <AccelerometerChart data={dataHistory} maxDataPoints={50} />
+                                
+                                <!-- Magnitude chart -->
+                                <MagnitudeChart data={dataHistory} maxDataPoints={50} />
                             </div>
                         {:else}
                             <div class="bg-white rounded-lg p-8 shadow-sm text-center">

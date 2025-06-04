@@ -1,0 +1,182 @@
+<script lang="ts">
+    import { onMount, onDestroy } from 'svelte';
+    import {
+        Chart,
+        CategoryScale,
+        LinearScale,
+        PointElement,
+        LineElement,
+        LineController,
+        Title,
+        Tooltip,
+        Legend,
+        Filler,
+        type ChartData,
+        type ChartOptions
+    } from 'chart.js';
+
+    // Register Chart.js components
+    Chart.register(
+        CategoryScale,
+        LinearScale,
+        PointElement,
+        LineElement,
+        LineController,
+        Title,
+        Tooltip,
+        Legend,
+        Filler
+    );
+
+    export let data: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+    export let maxDataPoints: number = 50;
+
+    let chartCanvas: HTMLCanvasElement;
+    let chart: Chart;
+
+    const chartData: ChartData<'line'> = {
+        labels: [],
+        datasets: [
+            {
+                label: 'Magnitude',
+                data: [],
+                borderColor: 'rgb(239, 68, 68)', // red-500
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                tension: 0.1,
+                pointRadius: 2,
+                pointHoverRadius: 6,
+                fill: true
+            }
+        ]
+    };
+
+    const chartOptions: ChartOptions<'line'> = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 0 // Disable animations for real-time updates
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index'
+        },
+        plugins: {
+            title: {
+                display: true,
+                text: 'Acceleration Magnitude',
+                font: {
+                    size: 14,
+                    weight: 'bold'
+                }
+            },
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    title: function(context) {
+                        const timestamp = parseInt(context[0].label);
+                        return new Date(timestamp).toLocaleTimeString();
+                    },
+                    label: function(context) {
+                        return `Magnitude: ${context.parsed.y.toFixed(3)} m/s²`;
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                type: 'category',
+                display: true,
+                title: {
+                    display: true,
+                    text: 'Time'
+                },
+                ticks: {
+                    maxTicksLimit: 8,
+                    callback: function(value, index) {
+                        const timestamp = chartData.labels?.[index] as number;
+                        if (timestamp) {
+                            return new Date(timestamp).toLocaleTimeString('en-US', {
+                                hour12: false,
+                                minute: '2-digit',
+                                second: '2-digit'
+                            });
+                        }
+                        return '';
+                    }
+                }
+            },
+            y: {
+                type: 'linear',
+                display: true,
+                title: {
+                    display: true,
+                    text: 'Magnitude (m/s²)'
+                },
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                },
+                beginAtZero: true
+            }
+        }
+    };
+
+    function updateChart() {
+        if (!chart || !data.length) return;
+
+        // Get the last maxDataPoints entries
+        const recentData = data.slice(-maxDataPoints);
+        
+        // Calculate magnitude for each data point
+        const magnitudeData = recentData.map(d => 
+            Math.sqrt(d.x ** 2 + d.y ** 2 + d.z ** 2)
+        );
+        
+        // Update labels (timestamps)
+        chartData.labels = recentData.map(d => d.timestamp);
+        
+        // Update dataset
+        chartData.datasets[0].data = magnitudeData;
+        
+        chart.update('none'); // Update without animation for real-time feel
+    }
+
+    onMount(() => {
+        if (chartCanvas) {
+            chart = new Chart(chartCanvas, {
+                type: 'line',
+                data: chartData,
+                options: chartOptions
+            });
+        }
+    });
+
+    onDestroy(() => {
+        if (chart) {
+            chart.destroy();
+        }
+    });
+
+    // Reactive statement to update chart when data changes
+    $: if (chart && data) {
+        updateChart();
+    }
+</script>
+
+<div class="bg-white rounded-lg p-4 shadow-sm">
+    <div class="h-48 w-full">
+        <canvas bind:this={chartCanvas}></canvas>
+    </div>
+    
+    <!-- Chart Info -->
+    <div class="mt-2 flex items-center justify-between text-sm">
+        <div class="flex items-center space-x-2">
+            <div class="w-3 h-1 bg-red-500 rounded"></div>
+            <span class="text-red-600">Overall Magnitude</span>
+        </div>
+        <div class="text-gray-500">
+            {data.length > 0 ? `Current: ${Math.sqrt(data[data.length-1]?.x**2 + data[data.length-1]?.y**2 + data[data.length-1]?.z**2).toFixed(3)} m/s²` : 'No data'}
+        </div>
+    </div>
+</div>

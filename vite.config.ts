@@ -5,6 +5,6 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
-		allowedHosts: ['localhost', 'clean-fans-flash.loca.lt'],
+		allowedHosts: ['localhost', '.loca.lt'],
 	},
 });
