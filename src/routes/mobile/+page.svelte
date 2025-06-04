@@ -10,10 +10,12 @@
     let connection: DataConnection | null = $state.raw(null);
     let showScanner: boolean = $state(false);
     let showQRCode: boolean = $state(false);
-    let messages: Array<{text: string, timestamp: Date, sender: 'me' | 'peer'}> = $state([]);
+    let isStreaming: boolean = $state(false);
+    let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
+    let streamingInterval: ReturnType<typeof setInterval> | null = null;
+    let permissionGranted: boolean = $state(false);
 
     let otherId: string = $state('');
-    let messageInput: string = $state('');
 
     // Debug effect to track connection state
     $effect(() => {
@@ -21,9 +23,93 @@
             connection: !!connection,
             peerId,
             peerStatus,
-            messagesCount: messages.length
+            isStreaming,
+            permissionGranted
         });
     });
+
+    // Request accelerometer permission
+    async function requestAccelerometerPermission() {
+        try {
+            // Check if we're on iOS 13+ which requires permission
+            if ('DeviceMotionEvent' in window && 'requestPermission' in DeviceMotionEvent) {
+                const permission = await (DeviceMotionEvent as any).requestPermission();
+                permissionGranted = permission === 'granted';
+                console.log('Mobile: Accelerometer permission:', permission);
+            } else {
+                // Android or older iOS - no permission needed
+                permissionGranted = true;
+                console.log('Mobile: Accelerometer available without permission');
+            }
+        } catch (error) {
+            console.error('Mobile: Error requesting accelerometer permission:', error);
+            permissionGranted = false;
+        }
+    }
+
+    // Start streaming accelerometer data
+    function startStreaming() {
+        if (!connection || !permissionGranted) {
+            console.log('Mobile: Cannot start streaming - connection or permission missing');
+            return;
+        }
+
+        console.log('Mobile: Starting accelerometer streaming...');
+        isStreaming = true;
+
+        // Listen for device motion events
+        const handleDeviceMotion = (event: DeviceMotionEvent) => {
+            if (event.acceleration && connection) {
+                const data = {
+                    x: event.acceleration.x || 0,
+                    y: event.acceleration.y || 0,
+                    z: event.acceleration.z || 0,
+                    timestamp: Date.now()
+                };
+                
+                accelerometerData = data;
+                
+                // Send data to peer
+                try {
+                    connection.send(JSON.stringify({
+                        type: 'accelerometer',
+                        data: data
+                    }));
+                } catch (error) {
+                    console.error('Mobile: Error sending accelerometer data:', error);
+                }
+            }
+        };
+
+        window.addEventListener('devicemotion', handleDeviceMotion);
+
+        // Also send data at regular intervals (fallback)
+        streamingInterval = setInterval(() => {
+            if (accelerometerData && connection) {
+                try {
+                    connection.send(JSON.stringify({
+                        type: 'heartbeat',
+                        timestamp: Date.now()
+                    }));
+                } catch (error) {
+                    console.error('Mobile: Error sending heartbeat:', error);
+                }
+            }
+        }, 1000);
+    }
+
+    // Stop streaming accelerometer data
+    function stopStreaming() {
+        console.log('Mobile: Stopping accelerometer streaming...');
+        isStreaming = false;
+        
+        window.removeEventListener('devicemotion', () => {});
+        
+        if (streamingInterval) {
+            clearInterval(streamingInterval);
+            streamingInterval = null;
+        }
+    }
 
     // Event handlers
     function handleConnect() {
@@ -35,20 +121,26 @@
             conn.on('open', () => {
                 console.log('Mobile: Outgoing connection opened to:', conn.peer);
                 connection = conn;
+                // Auto-request permission and start streaming when connected
+                if (!permissionGranted) {
+                    requestAccelerometerPermission().then(() => {
+                        if (permissionGranted) {
+                            startStreaming();
+                        }
+                    });
+                } else {
+                    startStreaming();
+                }
             });
             
             conn.on('data', (data) => {
                 console.log('Mobile: Received data from outgoing connection:', data);
-                const message = {
-                    text: data as string,
-                    timestamp: new Date(),
-                    sender: 'peer' as const
-                };
-                messages = [...messages, message];
+                // Handle incoming commands or data from desktop
             });
             
             conn.on('close', () => {
                 console.log('Mobile: Outgoing connection closed');
+                stopStreaming();
                 connection = null;
             });
             
@@ -73,41 +165,33 @@
         showScanner = false;
     }
 
-    function handleSendMessage() {
-        if (connection && messageInput.trim()) {
-            const message = {
-                text: messageInput.trim(),
-                timestamp: new Date(),
-                sender: 'me' as const
-            };
-            
-            try {
-                connection.send(message.text);
-                messages = [...messages, message];
-                messageInput = '';
-                console.log('Mobile: Message sent:', message.text);
-            } catch (error) {
-                console.error('Mobile: Error sending message:', error);
-            }
+    function handleToggleStreaming() {
+        if (isStreaming) {
+            stopStreaming();
         } else {
-            console.log('Mobile: Cannot send message - connection or input missing', {
-                connection: !!connection,
-                messageInput: messageInput.trim()
-            });
+            if (!permissionGranted) {
+                requestAccelerometerPermission().then(() => {
+                    if (permissionGranted) {
+                        startStreaming();
+                    }
+                });
+            } else {
+                startStreaming();
+            }
         }
     }
 
     function handleDisconnect() {
         console.log('Mobile: Disconnecting...');
         
-        // Close the connection first
+        // Stop streaming first
+        stopStreaming();
+        
+        // Close the connection
         if (connection) {
             connection.close();
             connection = null;
         }
-        
-        // Clear messages
-        messages = [];
         
         // Note: Don't disconnect the peer entirely, just close the connection
         // This allows for reconnection without reinitializing the peer
@@ -135,20 +219,26 @@
             
             conn.on("data", (data) => {
                 console.log('Mobile: Received data from incoming connection:', data);
-                const message = {
-                    text: data as string,
-                    timestamp: new Date(),
-                    sender: 'peer' as const
-                };
-                messages = [...messages, message];
+                // Handle incoming commands from desktop
             });
             
             conn.on("open", () => {
                 console.log('Mobile: Incoming connection opened with:', conn.peer);
+                // Auto-request permission and start streaming when connected
+                if (!permissionGranted) {
+                    requestAccelerometerPermission().then(() => {
+                        if (permissionGranted) {
+                            startStreaming();
+                        }
+                    });
+                } else {
+                    startStreaming();
+                }
             });
             
             conn.on('close', () => {
                 console.log('Mobile: Incoming connection closed');
+                stopStreaming();
                 connection = null;
             });
             
@@ -170,14 +260,14 @@
 
 <svelte:head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>PeerJS Mobile - Connection Hub</title>
+    <title>Sensor Timeline - Mobile Accelerometer</title>
 </svelte:head>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 text-white">
     <!-- Header -->
     <div class="sticky top-0 bg-white/10 backdrop-blur-md border-b border-white/20 p-4">
         <div class="flex items-center justify-between">
-            <h1 class="text-xl font-bold">PeerJS Mobile</h1>
+            <h1 class="text-xl font-bold">Sensor Timeline</h1>
             <div class="flex items-center space-x-2">
                 {#if peerStatus === 'Connected'}
                     <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -261,10 +351,10 @@
                 </div>
             </div>
         {:else}
-            <!-- Chat Interface -->
-            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 h-96 flex flex-col">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold">Chat</h2>
+            <!-- Accelerometer Streaming Interface -->
+            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-semibold">Accelerometer Stream</h2>
                     <button 
                         onclick={handleDisconnect}
                         class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded-lg text-sm transition-colors"
@@ -273,42 +363,86 @@
                     </button>
                 </div>
                 
-                <!-- Messages -->
-                <div class="flex-1 overflow-y-auto space-y-2 mb-3">
-                    {#each messages as message}
-                        <div class="flex {message.sender === 'me' ? 'justify-end' : 'justify-start'}">
-                            <div class="max-w-xs bg-{message.sender === 'me' ? 'blue' : 'gray'}-500 rounded-2xl px-3 py-2">
-                                <p class="text-sm">{message.text}</p>
-                                <p class="text-xs opacity-70 mt-1">
-                                    {message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                </p>
+                <!-- Permission Status -->
+                {#if !permissionGranted}
+                    <div class="bg-yellow-500/20 border border-yellow-400/30 rounded-lg p-4 mb-4">
+                        <div class="flex items-center space-x-2 mb-3">
+                            <span class="text-yellow-400">⚠️</span>
+                            <span class="font-medium">Permission Required</span>
+                        </div>
+                        <p class="text-sm text-yellow-100 mb-3">
+                            This app needs permission to access your device's motion sensors to stream accelerometer data.
+                        </p>
+                        <button 
+                            onclick={requestAccelerometerPermission}
+                            class="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded-lg text-black font-medium transition-colors"
+                        >
+                            Grant Permission
+                        </button>
+                    </div>
+                {:else}
+                    <!-- Streaming Status -->
+                    <div class="bg-green-500/20 border border-green-400/30 rounded-lg p-4 mb-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-green-400 rounded-full {isStreaming ? 'animate-pulse' : ''}"></div>
+                                <span class="font-medium">
+                                    {isStreaming ? 'Streaming Active' : 'Ready to Stream'}
+                                </span>
+                            </div>
+                            <button 
+                                onclick={handleToggleStreaming}
+                                disabled={!connection}
+                                class="bg-{isStreaming ? 'red' : 'green'}-500 hover:bg-{isStreaming ? 'red' : 'green'}-600 disabled:bg-gray-500 px-3 py-1 rounded-lg text-sm transition-colors"
+                            >
+                                {isStreaming ? 'Stop' : 'Start'}
+                            </button>
+                        </div>
+                    </div>
+                {/if}
+                
+                <!-- Current Sensor Data -->
+                {#if accelerometerData}
+                    <div class="bg-black/20 rounded-lg p-4">
+                        <h3 class="font-medium mb-3">Current Readings</h3>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div class="text-sm opacity-70">X-Axis</div>
+                                <div class="text-lg font-mono">
+                                    {accelerometerData.x.toFixed(2)}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-sm opacity-70">Y-Axis</div>
+                                <div class="text-lg font-mono">
+                                    {accelerometerData.y.toFixed(2)}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-sm opacity-70">Z-Axis</div>
+                                <div class="text-lg font-mono">
+                                    {accelerometerData.z.toFixed(2)}
+                                </div>
                             </div>
                         </div>
-                    {:else}
-                        <div class="text-center text-white/70 py-8">
-                            <p>No messages yet</p>
-                            <p class="text-sm">Start the conversation! 👋</p>
+                        <div class="text-xs opacity-50 text-center mt-2">
+                            Last updated: {new Date(accelerometerData.timestamp).toLocaleTimeString()}
+                            {#if isStreaming}
+                                <span class="ml-2 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                            {/if}
                         </div>
-                    {/each}
-                </div>
-                
-                <!-- Message Input -->
-                <div class="flex space-x-2">
-                    <input 
-                        type="text" 
-                        bind:value={messageInput}
-                        placeholder="Type a message..." 
-                        class="flex-1 bg-black/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-white/70 focus:border-white focus:outline-none"
-                        onkeydown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    />
-                    <button 
-                        onclick={handleSendMessage}
-                        disabled={!messageInput.trim() || !connection}
-                        class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 px-4 py-2 rounded-lg transition-colors"
-                    >
-                        Send
-                    </button>
-                </div>
+                    </div>
+                {:else if isStreaming}
+                    <div class="bg-black/20 rounded-lg p-4 text-center">
+                        <div class="text-4xl mb-2">📱</div>
+                        <p class="text-sm opacity-70">Move your device to see sensor data</p>
+                    </div>
+                {:else}
+                    <div class="bg-black/20 rounded-lg p-4 text-center">
+                        <div class="text-4xl mb-2">📊</div>
+                        <p class="text-sm opacity-70">Start streaming to see accelerometer data</p>
+                    </div>
+                {/if}
             </div>
         {/if}
     </div>

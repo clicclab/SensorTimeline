@@ -12,6 +12,9 @@
     let peerStatus: string | null = $state(null);
     let connection: DataConnection | null = $state.raw(null);
     let showScanner: boolean = $state(false);
+    let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
+    let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
+    let isReceivingData: boolean = $state(false);
 
     let otherId: string = $state('');
 
@@ -19,10 +22,11 @@
     $effect(() => {
         console.log('Main page - connection state changed:', {
             connection: !!connection,
-            connectionOpen: connection?.open,
             peerId,
             peerStatus,
-            otherId
+            otherId,
+            isReceivingData,
+            dataHistoryLength: dataHistory.length
         });
     });
 
@@ -44,6 +48,7 @@
             
             conn.on('data', (data) => {
                 console.log('Received data:', data);
+                handleIncomingData(data);
             });
             
             conn.on('close', () => {
@@ -72,27 +77,56 @@
         showScanner = false;
     }
 
+    function handleIncomingData(rawData: any) {
+        try {
+            const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+            
+            if (data.type === 'accelerometer' && data.data) {
+                accelerometerData = data.data;
+                dataHistory = [...dataHistory.slice(-99), data.data]; // Keep last 100 readings
+                isReceivingData = true;
+                console.log('Desktop: Received accelerometer data:', data.data);
+            } else if (data.type === 'heartbeat') {
+                console.log('Desktop: Received heartbeat');
+            }
+        } catch (error) {
+            console.error('Desktop: Error parsing incoming data:', error);
+        }
+    }
+
+    function clearDataHistory() {
+        dataHistory = [];
+        accelerometerData = null;
+        isReceivingData = false;
+    }
+
     function handleSendMessage() {
-        console.log('Attempting to send message, connection state:', {
+        console.log('Attempting to send command, connection state:', {
             connection: !!connection,
-            connectionOpen: connection?.open,
             connectionType: connection?.type
         });
         
         if (connection) {
             try {
-                connection.send('Hello from PeerJS!');
-                console.log('Message sent: Hello from PeerJS!');
+                connection.send(JSON.stringify({
+                    type: 'command',
+                    action: 'ping',
+                    timestamp: Date.now()
+                }));
+                console.log('Command sent to mobile device');
             } catch (error) {
-                console.error('Error sending message:', error);
+                console.error('Error sending command:', error);
             }
         } else {
-            console.log('Cannot send message: no connection');
+            console.log('Cannot send command: no connection');
         }
     }
 
     function handleDisconnect() {
         console.log('Desktop: Disconnecting...');
+        
+        // Clear data
+        clearDataHistory();
         
         if (connection) {
             connection.close();
@@ -121,15 +155,20 @@
             
             conn.on("data", (data) => {
                 console.log('Received data:', data);
+                handleIncomingData(data);
             });
             
             conn.on("open", () => {
                 console.log('Incoming connection opened with:', conn.peer);
-                conn.send("hello!");
+                conn.send(JSON.stringify({
+                    type: 'welcome',
+                    message: 'Connected to desktop'
+                }));
             });
             
             conn.on('close', () => {
                 console.log('Incoming connection closed');
+                clearDataHistory();
                 connection = null;
             });
             
@@ -154,7 +193,7 @@
         <div class="bg-white rounded-2xl shadow-xl p-8">
             <h1 class="text-4xl font-bold text-gray-900 mb-8 text-center">
                 <span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    PeerJS Connection Hub
+                    Sensor Timeline - Desktop Monitor
                 </span>
             </h1>
             
@@ -189,16 +228,101 @@
                     onSendMessage={handleSendMessage}
                     onDisconnect={handleDisconnect}
                 />
+                
+                <!-- Accelerometer Data Display -->
+                {#if connection}
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-semibold text-gray-900">Accelerometer Data</h2>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-{isReceivingData ? 'green' : 'gray'}-400 rounded-full {isReceivingData ? 'animate-pulse' : ''}"></div>
+                                <span class="text-sm text-gray-600">
+                                    {isReceivingData ? 'Receiving Data' : 'No Data'}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        {#if accelerometerData}
+                            <!-- Current Readings -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div class="bg-white rounded-lg p-4 shadow-sm">
+                                    <div class="text-sm font-medium text-gray-500 mb-1">X-Axis</div>
+                                    <div class="text-2xl font-mono text-blue-600">
+                                        {accelerometerData.x.toFixed(3)}
+                                    </div>
+                                    <div class="text-xs text-gray-400">m/s²</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm">
+                                    <div class="text-sm font-medium text-gray-500 mb-1">Y-Axis</div>
+                                    <div class="text-2xl font-mono text-green-600">
+                                        {accelerometerData.y.toFixed(3)}
+                                    </div>
+                                    <div class="text-xs text-gray-400">m/s²</div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm">
+                                    <div class="text-sm font-medium text-gray-500 mb-1">Z-Axis</div>
+                                    <div class="text-2xl font-mono text-purple-600">
+                                        {accelerometerData.z.toFixed(3)}
+                                    </div>
+                                    <div class="text-xs text-gray-400">m/s²</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Data History Stats -->
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-medium text-gray-900">Data Stream</h3>
+                                    <button 
+                                        onclick={clearDataHistory}
+                                        class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                                    >
+                                        Clear History
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                        <div class="text-gray-500">Total Readings</div>
+                                        <div class="font-mono">{dataHistory.length}</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-gray-500">Last Update</div>
+                                        <div class="font-mono">
+                                            {new Date(accelerometerData.timestamp).toLocaleTimeString()}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-gray-500">Magnitude</div>
+                                        <div class="font-mono">
+                                            {Math.sqrt(accelerometerData.x**2 + accelerometerData.y**2 + accelerometerData.z**2).toFixed(3)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-gray-500">Status</div>
+                                        <div class="text-green-600 font-medium">Active</div>
+                                    </div>
+                                </div>
+                            </div>
+                        {:else}
+                            <div class="bg-white rounded-lg p-8 shadow-sm text-center">
+                                <div class="text-4xl mb-4">📱</div>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">Waiting for Mobile Device</h3>
+                                <p class="text-gray-600">
+                                    Connect a mobile device to start receiving accelerometer data
+                                </p>
+                            </div>
+                        {/if}
+                    </div>
+                {/if}
             </div>
         </div>
         
         <!-- Footer -->
         <div class="mt-8 text-center">
             <p class="text-gray-600 text-sm">
-                Built with 
+                Real-time sensor data streaming with 
                 <span class="text-blue-600 font-semibold">SvelteKit</span> + 
                 <span class="text-blue-600 font-semibold">PeerJS</span> + 
-                <span class="text-blue-600 font-semibold">Tailwind CSS</span>
+                <span class="text-blue-600 font-semibold">Device Motion API</span>
             </p>
         </div>
     </div>
