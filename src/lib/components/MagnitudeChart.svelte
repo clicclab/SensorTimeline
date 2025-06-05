@@ -65,7 +65,7 @@
         plugins: {
             title: {
                 display: true,
-                text: 'Acceleration Magnitude',
+                text: recordingStartTime !== undefined ? 'Acceleration Magnitude (Playback)' : 'Acceleration Magnitude',
                 font: {
                     size: 14,
                     weight: 'bold'
@@ -102,8 +102,18 @@
                         const videoTime = chartData.labels?.[index] as number;
                         if (videoTime !== undefined) {
                             const minutes = Math.floor(videoTime / 60);
-                            const seconds = Math.floor(videoTime % 60);
-                            return minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}s`;
+                            const seconds = videoTime % 60;
+                            
+                            if (minutes > 0) {
+                                // For longer videos, show MM:SS format
+                                return `${minutes}:${Math.floor(seconds).toString().padStart(2, '0')}`;
+                            } else if (videoTime >= 10) {
+                                // For videos 10+ seconds, show whole seconds
+                                return `${Math.floor(seconds)}s`;
+                            } else {
+                                // For short videos, show fractional seconds
+                                return `${seconds.toFixed(1)}s`;
+                            }
                         }
                         return '';
                     }
@@ -127,8 +137,16 @@
     function updateChart() {
         if (!chart || !data.length) return;
 
-        // Get the last maxDataPoints entries
-        const recentData = data.slice(-maxDataPoints);
+        let recentData;
+        
+        // In playback mode, show all data; in real-time mode, show last maxDataPoints
+        if (recordingStartTime !== undefined) {
+            // Playback mode - show all data from recording
+            recentData = data;
+        } else {
+            // Real-time mode - show last maxDataPoints entries
+            recentData = data.slice(-maxDataPoints);
+        }
         
         // Calculate magnitude for each data point
         const magnitudeData = recentData.map(d => 
@@ -137,7 +155,10 @@
         
         // Convert timestamps to video time (seconds from recording start)
         if (recordingStartTime !== undefined) {
-            chartData.labels = recentData.map(d => (d.timestamp - recordingStartTime) / 1000);
+            // For playback mode, use the first sensor data point as time zero
+            // This ensures the chart starts at 0 regardless of any timing offset
+            const firstTimestamp = recentData.length > 0 ? recentData[0].timestamp : recordingStartTime;
+            chartData.labels = recentData.map(d => (d.timestamp - firstTimestamp) / 1000);
         } else {
             // Fallback to absolute timestamps for real-time mode
             chartData.labels = recentData.map(d => d.timestamp);
