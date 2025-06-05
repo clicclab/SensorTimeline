@@ -203,8 +203,10 @@
             <div class="w-3 h-1 bg-red-500 rounded"></div>
             <span class="text-red-600">Overall Magnitude</span>
         </div>
-        <div class="text-gray-500">
-            {data.length > 0 ? `Current: ${Math.sqrt(data[data.length-1]?.x**2 + data[data.length-1]?.y**2 + data[data.length-1]?.z**2).toFixed(3)} m/s²` : 'No data'}
-        </div>
+        {#if recordingStartTime === undefined}
+            <div class="text-gray-500">
+                {data.length > 0 ? `Current: ${Math.sqrt(data[data.length-1]?.x**2 + data[data.length-1]?.y**2 + data[data.length-1]?.z**2).toFixed(3)} m/s²` : 'No data'}
+            </div>
+        {/if}
     </div>
 </div>

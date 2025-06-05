@@ -213,7 +213,9 @@
     <!-- Chart Controls -->
     <div class="mt-4 flex items-center justify-between text-sm">
         <div class="flex items-center space-x-4">
-            <span class="text-gray-600">Showing last {maxDataPoints} readings</span>
+            {#if recordingStartTime === undefined}
+                <span class="text-gray-600">Showing last {maxDataPoints} readings</span>
+            {/if}
             <div class="flex items-center space-x-2">
                 <div class="w-3 h-1 bg-blue-500 rounded"></div>
                 <span class="text-blue-600">X-Axis</span>
@@ -227,8 +229,10 @@
                 <span class="text-purple-600">Z-Axis</span>
             </div>
         </div>
-        <div class="text-gray-500">
-            {data.length} total readings
-        </div>
+        {#if recordingStartTime === undefined}
+            <div class="text-gray-500">
+                {data.length} total readings
+            </div>
+        {/if}
     </div>
 </div>
