@@ -8,6 +8,9 @@
     import ActionButtons from "$lib/components/ActionButtons.svelte";
     import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
+    import WebcamRecorder from "$lib/components/WebcamRecorder.svelte";
+    import RecordingsList from "$lib/components/RecordingsList.svelte";
+    import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
@@ -17,6 +20,20 @@
     let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
     let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
     let isReceivingData: boolean = $state(false);
+
+    // Recording state
+    let isRecording: boolean = $state(false);
+    let recordingStartTime: number = 0;
+    let recordingSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+    let recordings: Array<{
+        id: string;
+        startTime: number;
+        endTime: number;
+        videoBlob: Blob;
+        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+        duration: number;
+    }> = $state([]);
+    let selectedRecording: any = $state(null);
 
     let otherId: string = $state('');
 
@@ -87,6 +104,12 @@
                 accelerometerData = data.data;
                 dataHistory = [...dataHistory.slice(-99), data.data]; // Keep last 100 readings
                 isReceivingData = true;
+                
+                // If recording, also add to recording sensor data
+                if (isRecording) {
+                    recordingSensorData = [...recordingSensorData, data.data];
+                }
+                
                 console.log('Desktop: Received accelerometer data:', data.data);
             } else if (data.type === 'heartbeat') {
                 console.log('Desktop: Received heartbeat');
@@ -100,6 +123,44 @@
         dataHistory = [];
         accelerometerData = null;
         isReceivingData = false;
+    }
+
+    // Recording handlers
+    function handleRecordingStart(startTime: number) {
+        isRecording = true;
+        recordingStartTime = startTime;
+        recordingSensorData = [];
+        console.log('Recording started at:', new Date(startTime));
+    }
+
+    function handleRecordingStop(endTime: number, videoBlob: Blob) {
+        isRecording = false;
+        
+        const newRecording = {
+            id: `recording-${Date.now()}`,
+            startTime: recordingStartTime,
+            endTime: endTime,
+            videoBlob: videoBlob,
+            sensorData: [...recordingSensorData],
+            duration: endTime - recordingStartTime
+        };
+        
+        recordings = [...recordings, newRecording];
+        recordingSensorData = [];
+        
+        console.log('Recording saved:', newRecording);
+    }
+
+    function handleDeleteRecording(id: string) {
+        recordings = recordings.filter(r => r.id !== id);
+    }
+
+    function handlePlayRecording(recording: any) {
+        selectedRecording = recording;
+    }
+
+    function handleClosePlayback() {
+        selectedRecording = null;
     }
 
     function handleSendMessage() {
@@ -231,6 +292,21 @@
                     onDisconnect={handleDisconnect}
                 />
                 
+                <!-- Webcam Recording Section -->
+                <WebcamRecorder 
+                    onRecordingStart={handleRecordingStart}
+                    onRecordingStop={handleRecordingStop}
+                />
+                
+                <!-- Recordings List -->
+                {#if recordings.length > 0}
+                    <RecordingsList 
+                        {recordings}
+                        onDeleteRecording={handleDeleteRecording}
+                        onPlayRecording={handlePlayRecording}
+                    />
+                {/if}
+                
                 <!-- Accelerometer Data Display -->
                 {#if connection}
                     <div class="bg-gray-50 rounded-xl p-6">
@@ -337,4 +413,10 @@
             </p>
         </div>
     </div>
+
+    <!-- Playback Modal -->
+    <PlaybackModal 
+        recording={selectedRecording}
+        onClose={handleClosePlayback}
+    />
 </div>
