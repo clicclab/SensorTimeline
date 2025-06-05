@@ -10,16 +10,13 @@ import { browser } from "$app/environment";
  * Accelerometer service.
  */
 
-var bluetoothDevice: BluetoothDevice & {gatt: BluetoothRemoteGATTServer} | null = null;
-var accelerometerDataCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-var accelerometerPeriodCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+let bluetoothDevice: BluetoothDevice & {gatt: BluetoothRemoteGATTServer} | null = null;
+let accelerometerPeriodCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
 // Callback for accelerometer data updates
 let onAccelerometerDataCallback: ((x: number, y: number, z: number) => void) | null = null;
 let onDisconnectedCallback: (() => void) | null = null;
 let onConnectedCallback: (() => void) | null = null;
-
-
 
 /**
  * Object containing the Bluetooth UUIDs of all the services and
@@ -89,9 +86,6 @@ function onDisconnected() {
     }
 }
 
-var accelerometerDataCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-var accelerometerPeriodCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-
 /**
  * Function that updates the HTML element according to the accelerometer data
  * characteristic.
@@ -102,7 +96,7 @@ function accelerometerDataChanged(event: Event): [number, number, number] {
         return [0, 0, 0]; // Default values if no event target
     }
 
-    let dataCharacteristic = event.target as BluetoothRemoteGATTCharacteristic;
+    const dataCharacteristic = event.target as BluetoothRemoteGATTCharacteristic;
 
     if (!dataCharacteristic.value) {
         console.error("Data characteristic value is null or undefined.");
@@ -113,9 +107,9 @@ function accelerometerDataChanged(event: Event): [number, number, number] {
         return [0, 0, 0]; // Default values if value is too short
     }
 
-    let accelerometerX = dataCharacteristic.value.getInt16(0, true); // Little Endian
-    let accelerometerY = dataCharacteristic.value.getInt16(2, true); // Little Endian
-    let accelerometerZ = dataCharacteristic.value.getInt16(4, true); // Little Endian
+    const accelerometerX = dataCharacteristic.value.getInt16(0, true); // Little Endian
+    const accelerometerY = dataCharacteristic.value.getInt16(2, true); // Little Endian
+    const accelerometerZ = dataCharacteristic.value.getInt16(4, true); // Little Endian
     
     // Call the callback with the new data
     if (onAccelerometerDataCallback) {
@@ -139,10 +133,10 @@ function readAccelerometerPeriod() : Promise<number> {
                 console.error("There is no Accelerometer Period characteristic.");
             } else {
                 return accelerometerPeriodCharacteristic.readValue()
-                .then(value => {
+                .then((value: DataView) => {
                     return value.getUint16(0, true); // Little Endian
                 })
-                .catch(error => {
+                .catch((error: Error) => {
                     console.error(error);
                     return 0; // Default value if error occurs
                 });
@@ -168,14 +162,14 @@ function writeAccelerometerPeriod(value: number) {
             if (!accelerometerPeriodCharacteristic) {
                 console.error("There is no Accelerometer Period characteristic.");
             } else {
-                let buffer = new ArrayBuffer(2);
-                let accelerometerPeriod = new DataView(buffer);
+                const buffer = new ArrayBuffer(2);
+                const accelerometerPeriod = new DataView(buffer);
                 accelerometerPeriod.setUint16(0, value, true); // Little Endian
                 accelerometerPeriodCharacteristic.writeValue(accelerometerPeriod)
-                .then(_ => {
-                    
+                .then(() => {
+                    console.log("Accelerometer period written successfully.");
                 })
-                .catch(error => {
+                .catch((error: Error) => {
                     console.error(error);
                 });
             };
@@ -206,7 +200,7 @@ function connect(): Promise<void> {
             filters: [{namePrefix: "BBC micro:bit"}],
             optionalServices: [microbitUuid.genericAccess[0], microbitUuid.genericAttribute[0], microbitUuid.deviceInformation[0], microbitUuid.accelerometerService[0], microbitUuid.magnetometerService[0], microbitUuid.buttonService[0], microbitUuid.ioPinService[0], microbitUuid.ledService[0], microbitUuid.eventService[0], microbitUuid.dfuControlService[0], microbitUuid.temperatureService[0], microbitUuid.uartService[0]],
         })
-        .then(device => {
+        .then((device: BluetoothDevice) => {
             if (!device.gatt) {
                 throw new Error("The device does not support GATT.");
             }
@@ -216,22 +210,21 @@ function connect(): Promise<void> {
             device.addEventListener('gattserverdisconnected', onDisconnected);
             return device.gatt.connect();
         })
-        .then(server => {
+        .then((server: BluetoothRemoteGATTServer) => {
             console.log("Getting Accelerometer service (UUID: " + microbitUuid.accelerometerService[0] + ")... ");
             return server.getPrimaryService(microbitUuid.accelerometerService[0]);
         })
-        .then(service => {
+        .then((service: BluetoothRemoteGATTService) => {
             console.log("Getting Accelerometer data characteristic... ");
             return service.getCharacteristic(microbitUuid.accelerometerData[0])
-            .then(dataChar => {
-                accelerometerDataCharacteristic = dataChar;
+            .then((dataChar: BluetoothRemoteGATTCharacteristic) => {
                 console.log("Starting accelerometer data notifications... ");
                 return dataChar.startNotifications()
-                .then(_ => {
+                .then((_: BluetoothRemoteGATTCharacteristic) => {
                     dataChar.addEventListener('characteristicvaluechanged', accelerometerDataChanged);
                     console.log("Getting Accelerometer period characteristic... ");
                     return service.getCharacteristic(microbitUuid.accelerometerPeriod[0])
-                    .then(periodChar => {
+                    .then((periodChar: BluetoothRemoteGATTCharacteristic) => {
                         accelerometerPeriodCharacteristic = periodChar;
                         console.log("micro:bit connection fully established!");
                         

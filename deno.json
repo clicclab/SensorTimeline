@@ -1,3 +1,14 @@
 {
-  "nodeModulesDir": "auto"
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "checkJs": true,
+    "strict": true,
+    "types": [
+      "@types/web-bluetooth"
+    ],
+    "lib": ["dom", "dom.iterable", "es6"]
+  },
+  "unstable": [
+    "sloppy-imports"
+  ]
 }
