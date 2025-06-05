@@ -11,6 +11,7 @@
     import WebcamRecorder from "$lib/components/WebcamRecorder.svelte";
     import RecordingsList from "$lib/components/RecordingsList.svelte";
     import PlaybackModal from "$lib/components/PlaybackModal.svelte";
+    import MicroBitController from "$lib/components/MicroBitController.svelte";
 
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
@@ -20,6 +21,12 @@
     let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
     let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
     let isReceivingData: boolean = $state(false);
+
+    // micro:bit connection state
+    let isMicroBitConnected: boolean = $state(false);
+
+    // Input source selection
+    let inputSource: 'webrtc' | 'microbit' = $state('webrtc');
 
     // Recording state
     let isRecording: boolean = $state(false);
@@ -249,6 +256,43 @@
             console.error('PeerJS error:', err);
         });
     }
+
+    // Reactive statement to handle input source changes
+    $effect(() => {
+        // Clear data when switching input sources
+        clearDataHistory();
+        console.log('Input source changed to:', inputSource);
+    });
+
+    // micro:bit event handlers
+    function handleMicroBitData(x: number, y: number, z: number) {
+        const timestamp = Date.now();
+        const newData = { x, y, z, timestamp };
+        
+        accelerometerData = newData;
+        dataHistory = [...dataHistory.slice(-99), newData]; // Keep last 100 readings
+        isReceivingData = true;
+        
+        // If recording, also add to recording sensor data
+        if (isRecording) {
+            recordingSensorData = [...recordingSensorData, newData];
+        }
+        
+        console.log('Desktop: Received micro:bit data:', newData);
+    }
+
+    function handleMicroBitConnectionChange(connected: boolean) {
+        isMicroBitConnected = connected;
+        
+        if (!connected) {
+            // Clear data when micro:bit disconnects
+            if (inputSource === 'microbit') {
+                clearDataHistory();
+            }
+        }
+    }
+
+    // Event handlers
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
@@ -268,28 +312,81 @@
                 </div>
             </div>
             
+            <!-- Input Source Selection -->
+            <div class="mb-8 p-6 bg-gray-50 rounded-xl">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Select Input Source</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="relative">
+                        <input 
+                            type="radio" 
+                            bind:group={inputSource} 
+                            value="webrtc"
+                            class="peer sr-only"
+                        />
+                        <div class="p-4 border-2 border-gray-200 rounded-lg cursor-pointer peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-gray-300 transition-all">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white text-sm">📱</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-medium text-gray-900">Mobile Device</h3>
+                                    <p class="text-sm text-gray-600">Connect via WebRTC</p>
+                                </div>
+                            </div>
+                        </div>
+                    </label>
+                    
+                    <label class="relative">
+                        <input 
+                            type="radio" 
+                            bind:group={inputSource} 
+                            value="microbit"
+                            class="peer sr-only"
+                        />
+                        <div class="p-4 border-2 border-gray-200 rounded-lg cursor-pointer peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-all">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white text-sm font-bold">μ</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-medium text-gray-900">micro:bit</h3>
+                                    <p class="text-sm text-gray-600">Connect via Bluetooth</p>
+                                </div>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
             <!-- Connection Section -->
             <div class="space-y-6">
-                <ConnectionForm 
-                    {otherId}
-                    {peer}
-                    {connection}
-                    onIdChange={handleIdChange}
-                    onConnect={handleConnect}
-                    onScanRequest={handleScanRequest}
-                />
+                {#if inputSource === 'webrtc'}
+                    <ConnectionForm 
+                        {otherId}
+                        {peer}
+                        {connection}
+                        onIdChange={handleIdChange}
+                        onConnect={handleConnect}
+                        onScanRequest={handleScanRequest}
+                    />
 
-                <QRScanner 
-                    isOpen={showScanner}
-                    onScan={handleScanResult}
-                    onClose={handleScanClose}
-                />
-                
-                <ActionButtons 
-                    {connection}
-                    {peer}
-                    onDisconnect={handleDisconnect}
-                />
+                    <QRScanner 
+                        isOpen={showScanner}
+                        onScan={handleScanResult}
+                        onClose={handleScanClose}
+                    />
+                    
+                    <ActionButtons 
+                        {connection}
+                        {peer}
+                        onDisconnect={handleDisconnect}
+                    />
+                {:else if inputSource === 'microbit'}
+                    <MicroBitController 
+                        onDataReceived={handleMicroBitData}
+                        onConnectionChange={handleMicroBitConnectionChange}
+                    />
+                {/if}
                 
                 <!-- Webcam Recording Section -->
                 <WebcamRecorder 
@@ -307,7 +404,7 @@
                 {/if}
                 
                 <!-- Accelerometer Data Display -->
-                {#if connection}
+                {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
                     <div class="bg-gray-50 rounded-xl p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-xl font-semibold text-gray-900">Accelerometer Data</h2>
@@ -315,6 +412,9 @@
                                 <div class="w-3 h-3 bg-{isReceivingData ? 'green' : 'gray'}-400 rounded-full {isReceivingData ? 'animate-pulse' : ''}"></div>
                                 <span class="text-sm text-gray-600">
                                     {isReceivingData ? 'Receiving Data' : 'No Data'}
+                                </span>
+                                <span class="text-xs bg-gray-200 px-2 py-1 rounded">
+                                    {inputSource === 'webrtc' ? 'WebRTC' : 'micro:bit'}
                                 </span>
                             </div>
                         </div>
@@ -390,10 +490,17 @@
                             </div>
                         {:else}
                             <div class="bg-white rounded-lg p-8 shadow-sm text-center">
-                                <div class="text-4xl mb-4">📱</div>
-                                <h3 class="text-lg font-medium text-gray-900 mb-2">Waiting for Mobile Device</h3>
+                                <div class="text-4xl mb-4">
+                                    {inputSource === 'webrtc' ? '📱' : '🔬'}
+                                </div>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">
+                                    Waiting for {inputSource === 'webrtc' ? 'Mobile Device' : 'micro:bit'}
+                                </h3>
                                 <p class="text-gray-600">
-                                    Connect a mobile device to start receiving accelerometer data
+                                    {inputSource === 'webrtc' 
+                                        ? 'Connect a mobile device to start receiving accelerometer data'
+                                        : 'Connect your micro:bit to start receiving accelerometer data'
+                                    }
                                 </p>
                             </div>
                         {/if}
@@ -408,7 +515,8 @@
                 Real-time sensor data streaming with 
                 <span class="text-blue-600 font-semibold">SvelteKit</span> + 
                 <span class="text-blue-600 font-semibold">PeerJS</span> + 
-                <span class="text-blue-600 font-semibold">Device Motion API</span>
+                <span class="text-blue-600 font-semibold">Device Motion API</span> + 
+                <span class="text-purple-600 font-semibold">micro:bit Bluetooth</span>
             </p>
         </div>
     </div>

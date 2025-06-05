@@ -11,6 +11,13 @@ import { browser } from "$app/environment";
  */
 
 var bluetoothDevice: BluetoothDevice & {gatt: BluetoothRemoteGATTServer} | null = null;
+var accelerometerDataCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+var accelerometerPeriodCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+
+// Callback for accelerometer data updates
+let onAccelerometerDataCallback: ((x: number, y: number, z: number) => void) | null = null;
+let onDisconnectedCallback: (() => void) | null = null;
+let onConnectedCallback: (() => void) | null = null;
 
 
 
@@ -77,6 +84,9 @@ const microbitUuid = {
  */
 function onDisconnected() {
     console.log("Device disconnected.");
+    if (onDisconnectedCallback) {
+        onDisconnectedCallback();
+    }
 }
 
 var accelerometerDataCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
@@ -106,6 +116,12 @@ function accelerometerDataChanged(event: Event): [number, number, number] {
     let accelerometerX = dataCharacteristic.value.getInt16(0, true); // Little Endian
     let accelerometerY = dataCharacteristic.value.getInt16(2, true); // Little Endian
     let accelerometerZ = dataCharacteristic.value.getInt16(4, true); // Little Endian
+    
+    // Call the callback with the new data
+    if (onAccelerometerDataCallback) {
+        onAccelerometerDataCallback(accelerometerX, accelerometerY, accelerometerZ);
+    }
+    
     return [accelerometerX, accelerometerY, accelerometerZ];
 }
 
@@ -174,39 +190,39 @@ function writeAccelerometerPeriod(value: number) {
  * Function that connects to a Bluetooth device, and saves the characteristics
  * associated with the Accelerometer service.
  */
-function connect() {
+function connect(): Promise<void> {
     if(!browser) {
         console.error("This function is only available in the browser.");
-        return;
+        return Promise.reject(new Error("This function is only available in the browser."));
     }
 
     console.log("Requesting micro:bit Bluetooth devices... ");
     if (!navigator.bluetooth) {
         console.error("Bluetooth not available in this browser or computer.");
+        return Promise.reject(new Error("Bluetooth not available in this browser or computer."));
     } else {
-        navigator.bluetooth.requestDevice({
+        return navigator.bluetooth.requestDevice({
             // To accept all devices, use acceptAllDevices: true and remove filters.
             filters: [{namePrefix: "BBC micro:bit"}],
             optionalServices: [microbitUuid.genericAccess[0], microbitUuid.genericAttribute[0], microbitUuid.deviceInformation[0], microbitUuid.accelerometerService[0], microbitUuid.magnetometerService[0], microbitUuid.buttonService[0], microbitUuid.ioPinService[0], microbitUuid.ledService[0], microbitUuid.eventService[0], microbitUuid.dfuControlService[0], microbitUuid.temperatureService[0], microbitUuid.uartService[0]],
         })
         .then(device => {
             if (!device.gatt) {
-                console.error("The device does not support GATT.");
-                return;
+                throw new Error("The device does not support GATT.");
             }
 
             bluetoothDevice = device as BluetoothDevice & {gatt: BluetoothRemoteGATTServer};
             console.log("Connecting to GATT server (name: " + device.name + ", ID: " + device.id + ")... ");
             device.addEventListener('gattserverdisconnected', onDisconnected);
-            return device.gatt?.connect();
+            return device.gatt.connect();
         })
         .then(server => {
             console.log("Getting Accelerometer service (UUID: " + microbitUuid.accelerometerService[0] + ")... ");
-            return server?.getPrimaryService(microbitUuid.accelerometerService[0]);
+            return server.getPrimaryService(microbitUuid.accelerometerService[0]);
         })
         .then(service => {
             console.log("Getting Accelerometer data characteristic... ");
-            service?.getCharacteristic(microbitUuid.accelerometerData[0])
+            return service.getCharacteristic(microbitUuid.accelerometerData[0])
             .then(dataChar => {
                 accelerometerDataCharacteristic = dataChar;
                 console.log("Starting accelerometer data notifications... ");
@@ -214,27 +230,20 @@ function connect() {
                 .then(_ => {
                     dataChar.addEventListener('characteristicvaluechanged', accelerometerDataChanged);
                     console.log("Getting Accelerometer period characteristic... ");
-                    service.getCharacteristic(microbitUuid.accelerometerPeriod[0])
+                    return service.getCharacteristic(microbitUuid.accelerometerPeriod[0])
                     .then(periodChar => {
                         accelerometerPeriodCharacteristic = periodChar;
+                        console.log("micro:bit connection fully established!");
                         
-                    })
-                    .catch(error => {
-                        console.error(error);
+                        // Call the connected callback
+                        if (onConnectedCallback) {
+                            onConnectedCallback();
+                        }
                     });
-                })
-                .catch(error => {
-                    console.error(error);
                 });
-            })
-            .catch(error => {
-                console.error(error);
             });
-        })
-        .catch(error => {
-            console.error(error);
         });
-    };
+    }
 }
 
 
@@ -257,3 +266,43 @@ function disconnect() {
         };
     };
 }
+
+/**
+ * Set callback for accelerometer data updates
+ */
+export function setAccelerometerDataCallback(callback: (x: number, y: number, z: number) => void) {
+    onAccelerometerDataCallback = callback;
+}
+
+/**
+ * Set callback for disconnection events
+ */
+export function setDisconnectedCallback(callback: () => void) {
+    onDisconnectedCallback = callback;
+}
+
+/**
+ * Set callback for connection events
+ */
+export function setConnectedCallback(callback: () => void) {
+    onConnectedCallback = callback;
+}
+
+/**
+ * Check if micro:bit is connected
+ */
+export function isConnected(): boolean {
+    return bluetoothDevice !== null && bluetoothDevice.gatt.connected;
+}
+
+/**
+ * Get device name if connected
+ */
+export function getDeviceName(): string | null {
+    return bluetoothDevice?.name || null;
+}
+
+/**
+ * Export the main functions
+ */
+export { connect, disconnect, readAccelerometerPeriod, writeAccelerometerPeriod };
