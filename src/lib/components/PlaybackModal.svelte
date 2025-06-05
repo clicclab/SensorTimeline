@@ -20,9 +20,10 @@
     let videoUrl = '';
     let playbackInterval: ReturnType<typeof setInterval> | null = null;
     
-    // Current sensor data based on video time
+    // Full sensor data and current position
     let currentSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
     let currentReading: {x: number, y: number, z: number, timestamp: number} | null = null;
+    let currentTimelinePosition = 0; // Position in the timeline (0-1)
 
     // Sync sensor data with video playback
     function updateSensorData() {
@@ -31,10 +32,11 @@
         const videoCurrentTime = videoElement.currentTime * 1000; // Convert to ms
         const absoluteTime = recording.startTime + videoCurrentTime;
         
-        // Find sensor data up to current video time
-        currentSensorData = recording.sensorData.filter(data => 
-            data.timestamp <= absoluteTime
-        );
+        // Show all sensor data from the entire recording
+        currentSensorData = recording.sensorData;
+        
+        // Calculate timeline position (0-1) for highlighting current position
+        currentTimelinePosition = videoCurrentTime / recording.duration;
         
         // Find the closest sensor reading to current time
         let closestReading = null;
@@ -80,6 +82,8 @@
             URL.revokeObjectURL(videoUrl);
         }
         videoUrl = URL.createObjectURL(recording.videoBlob);
+        // Initialize with all sensor data
+        currentSensorData = recording.sensorData;
     }
 
     onMount(() => {
@@ -121,7 +125,7 @@
                     <video 
                         bind:this={videoElement}
                         src={videoUrl}
-                        class="w-full h-64 bg-gray-900 rounded-lg object-cover"
+                        class="w-full aspect-video bg-gray-900 rounded-lg object-cover"
                         onplay={() => { isPlaying = true; }}
                         onpause={() => { isPlaying = false; }}
                         ontimeupdate={updateSensorData}
@@ -191,10 +195,10 @@
                     </div>
                 {/if}
 
-                <!-- Charts showing data up to current time -->
+                <!-- Charts showing all sensor data -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <AccelerometerChart data={currentSensorData} maxDataPoints={100} />
-                    <MagnitudeChart data={currentSensorData} maxDataPoints={100} />
+                    <AccelerometerChart data={currentSensorData} maxDataPoints={200} />
+                    <MagnitudeChart data={currentSensorData} maxDataPoints={200} />
                 </div>
 
                 <!-- Recording Info -->

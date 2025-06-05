@@ -150,7 +150,7 @@
             autoplay 
             muted 
             playsinline
-            class="w-full h-48 bg-gray-900 rounded-lg object-cover"
+            class="w-full aspect-video bg-gray-900 rounded-lg object-cover"
         ></video>
         
         {#if !hasPermission}
