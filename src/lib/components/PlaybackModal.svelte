@@ -197,8 +197,18 @@
 
                 <!-- Charts showing all sensor data -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <AccelerometerChart data={currentSensorData} maxDataPoints={200} />
-                    <MagnitudeChart data={currentSensorData} maxDataPoints={200} />
+                    <AccelerometerChart 
+                        data={currentSensorData} 
+                        maxDataPoints={200} 
+                        recordingStartTime={recording.startTime}
+                        currentVideoTime={currentTime}
+                    />
+                    <MagnitudeChart 
+                        data={currentSensorData} 
+                        maxDataPoints={200} 
+                        recordingStartTime={recording.startTime}
+                        currentVideoTime={currentTime}
+                    />
                 </div>
 
                 <!-- Recording Info -->

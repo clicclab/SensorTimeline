@@ -30,6 +30,8 @@
 
     export let data: Array<{x: number, y: number, z: number, timestamp: number}> = [];
     export let maxDataPoints: number = 50;
+    export let recordingStartTime: number | undefined = undefined;
+    export let currentVideoTime: number | undefined = undefined;
 
     let chartCanvas: HTMLCanvasElement;
     let chart: Chart;
@@ -75,8 +77,10 @@
             tooltip: {
                 callbacks: {
                     title: function(context) {
-                        const timestamp = parseInt(context[0].label);
-                        return new Date(timestamp).toLocaleTimeString();
+                        const videoTime = parseFloat(context[0].label);
+                        const minutes = Math.floor(videoTime / 60);
+                        const seconds = (videoTime % 60).toFixed(1);
+                        return `${minutes}:${seconds.padStart(4, '0')}`;
                     },
                     label: function(context) {
                         return `Magnitude: ${context.parsed.y.toFixed(3)} m/s²`;
@@ -90,18 +94,16 @@
                 display: true,
                 title: {
                     display: true,
-                    text: 'Time'
+                    text: 'Video Time (seconds)'
                 },
                 ticks: {
                     maxTicksLimit: 8,
                     callback: function(value, index) {
-                        const timestamp = chartData.labels?.[index] as number;
-                        if (timestamp) {
-                            return new Date(timestamp).toLocaleTimeString('en-US', {
-                                hour12: false,
-                                minute: '2-digit',
-                                second: '2-digit'
-                            });
+                        const videoTime = chartData.labels?.[index] as number;
+                        if (videoTime !== undefined) {
+                            const minutes = Math.floor(videoTime / 60);
+                            const seconds = Math.floor(videoTime % 60);
+                            return minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}s`;
                         }
                         return '';
                     }
@@ -133,8 +135,13 @@
             Math.sqrt(d.x ** 2 + d.y ** 2 + d.z ** 2)
         );
         
-        // Update labels (timestamps)
-        chartData.labels = recentData.map(d => d.timestamp);
+        // Convert timestamps to video time (seconds from recording start)
+        if (recordingStartTime !== undefined) {
+            chartData.labels = recentData.map(d => (d.timestamp - recordingStartTime) / 1000);
+        } else {
+            // Fallback to absolute timestamps for real-time mode
+            chartData.labels = recentData.map(d => d.timestamp);
+        }
         
         // Update dataset
         chartData.datasets[0].data = magnitudeData;
