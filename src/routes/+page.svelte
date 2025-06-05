@@ -26,7 +26,7 @@
     let isMicroBitConnected: boolean = $state(false);
 
     // Input source selection
-    let inputSource: 'webrtc' | 'microbit' = $state('webrtc');
+    let inputSource: 'webrtc' | 'microbit' = $state('microbit');
 
     // Recording state
     let isRecording: boolean = $state(false);
@@ -208,54 +208,66 @@
         console.log('Desktop: Disconnected, ready for new connections');
     }
 
-    // Initialize PeerJS
-    if (browser) {
-        const newPeer = new Peer();
-        peer = newPeer;
+    // Initialize PeerJS when WebRTC mode is selected
+    $effect(() => {
+        if (browser && inputSource === 'webrtc' && !peer) {
+            const newPeer = new Peer();
+            peer = newPeer;
 
-        newPeer.on('open', id => {
-            console.log('Peer ID:', id);
-            peerStatus = 'Connected';
-            peerId = id;
-        });
+            newPeer.on('open', id => {
+                console.log('Peer ID:', id);
+                peerStatus = 'Connected';
+                peerId = id;
+            });
 
-        newPeer.on("connection", (conn) => {
-            console.log('Incoming connection from:', conn.peer);
-            connection = conn;
-            
-            conn.on("data", (data) => {
-                console.log('Received data:', data);
-                handleIncomingData(data);
+            newPeer.on("connection", (conn) => {
+                console.log('Incoming connection from:', conn.peer);
+                connection = conn;
+                
+                conn.on("data", (data) => {
+                    console.log('Received data:', data);
+                    handleIncomingData(data);
+                });
+                
+                conn.on("open", () => {
+                    console.log('Incoming connection opened with:', conn.peer);
+                    conn.send(JSON.stringify({
+                        type: 'welcome',
+                        message: 'Connected to desktop'
+                    }));
+                });
+                
+                conn.on('close', () => {
+                    console.log('Incoming connection closed');
+                    clearDataHistory();
+                    connection = null;
+                });
+                
+                conn.on('error', (err) => {
+                    console.error('Incoming connection error:', err);
+                });
             });
             
-            conn.on("open", () => {
-                console.log('Incoming connection opened with:', conn.peer);
-                conn.send(JSON.stringify({
-                    type: 'welcome',
-                    message: 'Connected to desktop'
-                }));
+            newPeer.on('close', () => {
+                console.log('Connection closed');
+                peerStatus = 'Disconnected';
             });
-            
-            conn.on('close', () => {
-                console.log('Incoming connection closed');
-                clearDataHistory();
+
+            newPeer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+            });
+        } else if (inputSource !== 'webrtc' && peer) {
+            // Clean up PeerJS when switching away from WebRTC mode
+            if (connection) {
+                connection.close();
                 connection = null;
-            });
-            
-            conn.on('error', (err) => {
-                console.error('Incoming connection error:', err);
-            });
-        });
-        
-        newPeer.on('close', () => {
-            console.log('Connection closed');
-            peerStatus = 'Disconnected';
-        });
-
-        newPeer.on('error', (err) => {
-            console.error('PeerJS error:', err);
-        });
-    }
+            }
+            peer.destroy();
+            peer = null;
+            peerId = null;
+            peerStatus = null;
+        }
+    });
 
     // Reactive statement to handle input source changes
     $effect(() => {
@@ -305,12 +317,14 @@
             </h1>
             
             <!-- Status Section -->
-            <div class="mb-8 p-6 bg-gray-50 rounded-xl">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <PeerStatus {peerId} {peerStatus} />
-                    <QRCodeDisplay {peerId} />
+            {#if inputSource === 'webrtc'}
+                <div class="mb-8 p-6 bg-gray-50 rounded-xl">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <PeerStatus {peerId} {peerStatus} />
+                        <QRCodeDisplay {peerId} />
+                    </div>
                 </div>
-            </div>
+            {/if}
             
             <!-- Input Source Selection -->
             <div class="mb-8 p-6 bg-gray-50 rounded-xl">
