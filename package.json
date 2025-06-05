@@ -14,10 +14,11 @@
 	},
 	"dependencies": {
 		"@sveltejs/adapter-static": "^3.0.8",
+		"@types/plotly.js": "^3.0.0",
 		"@types/qrcode": "^1.5.5",
 		"@types/web-bluetooth": "^0.0.21",
-		"chart.js": "^4.4.9",
 		"peerjs": "^1.5.4",
+		"plotly.js-dist": "^3.0.1",
 		"qr-scanner": "^1.4.2",
 		"qrcode": "^1.5.4"
 	},
