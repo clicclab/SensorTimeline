@@ -9,6 +9,15 @@
     let plotDiv: HTMLDivElement;
     let plotInitialized = false;
 
+    function resetZoom() {
+        if (plotDiv && plotInitialized) {
+            Plotly.relayout(plotDiv, {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+        }
+    }
+
     function updateChart() {
         if (!plotDiv || !data.length || !plotInitialized) return;
 
@@ -158,6 +167,21 @@
     
     <!-- Chart Info -->
     <div class="mt-2 flex items-center justify-between text-sm">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-1 bg-red-500 rounded"></div>
+                <span class="text-red-600">Overall Magnitude</span>
+            </div>
+            {#if recordingStartTime !== undefined}
+                <button 
+                    on:click={resetZoom}
+                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border transition-colors"
+                    disabled={!plotInitialized}
+                >
+                    Reset Zoom
+                </button>
+            {/if}
+        </div>
         {#if recordingStartTime === undefined}
             <div class="text-gray-500">
                 {data.length > 0 ? `Current: ${Math.sqrt(data[data.length-1]?.x**2 + data[data.length-1]?.y**2 + data[data.length-1]?.z**2).toFixed(3)} m/s²` : 'No data'}

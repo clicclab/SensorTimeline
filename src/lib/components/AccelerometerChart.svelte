@@ -9,6 +9,15 @@
     let plotDiv: HTMLDivElement;
     let plotInitialized = false;
 
+    function resetZoom() {
+        if (plotDiv && plotInitialized) {
+            Plotly.relayout(plotDiv, {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+        }
+    }
+
     function updateChart() {
         if (!plotDiv || !data.length || !plotInitialized) return;
 
@@ -171,6 +180,27 @@
         <div class="flex items-center space-x-4">
             {#if recordingStartTime === undefined}
                 <span class="text-gray-600">Showing last {maxDataPoints} readings</span>
+            {/if}
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-1 bg-blue-500 rounded"></div>
+                <span class="text-blue-600">X-Axis</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-1 bg-green-500 rounded"></div>
+                <span class="text-green-600">Y-Axis</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-1 bg-purple-500 rounded"></div>
+                <span class="text-purple-600">Z-Axis</span>
+            </div>
+            {#if recordingStartTime !== undefined}
+                <button 
+                    on:click={resetZoom}
+                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border transition-colors"
+                    disabled={!plotInitialized}
+                >
+                    Reset Zoom
+                </button>
             {/if}
         </div>
         {#if recordingStartTime === undefined}
