@@ -10,9 +10,9 @@
 <div class="lg:col-span-2">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Your Peer ID</label>
+            <label class="block text-sm font-semibold text-gray-700 mb-2" for="peerIdDisplay">Your Peer ID</label>
             <div class="flex items-center space-x-2">
-                <code class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-mono text-gray-900">
+                <code class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-mono text-gray-900" id="peerIdDisplay">
                     {peerId || 'Generating...'}
                 </code>
                 {#if peerId}
@@ -28,9 +28,9 @@
         </div>
         
         <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Connection Status</label>
+            <label class="block text-sm font-semibold text-gray-700 mb-2" for="connectionStatus">Connection Status</label>
             <div class="flex items-center space-x-2">
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-2" id="connectionStatus">
                     {#if peerStatus === 'Connected'}
                         <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                         <span class="text-green-700 font-medium">Connected</span>

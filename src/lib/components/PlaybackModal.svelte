@@ -126,8 +126,8 @@
                         onpause={() => { isPlaying = false; }}
                         ontimeupdate={updateSensorData}
                         onloadedmetadata={updateSensorData}
-                    ></video>
-                    
+                    ><track kind="captions" /></video>
+
                     <!-- Video Controls -->
                     <div class="mt-2 flex items-center space-x-3">
                         <button 

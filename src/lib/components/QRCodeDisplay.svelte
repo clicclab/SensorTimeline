@@ -35,8 +35,8 @@
 </script>
 
 <div class="flex flex-col items-center justify-center">
-    <label class="block text-sm font-semibold text-gray-700 mb-2 text-center">QR Code</label>
-    <div class="bg-white p-4 rounded-xl shadow-inner border-2 border-gray-200">
+    <label class="block text-sm font-semibold text-gray-700 mb-2 text-center" for="qrCodeContainer">QR Code</label>
+    <div class="bg-white p-4 rounded-xl shadow-inner border-2 border-gray-200" id="qrCodeContainer">
         {#if qrCodeDataUrl}
             <img 
                 src={qrCodeDataUrl} 

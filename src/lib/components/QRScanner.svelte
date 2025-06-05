@@ -80,7 +80,7 @@
                     bind:this={videoElement}
                     class="w-full h-64 bg-gray-100 rounded-lg object-cover"
                     style="aspect-ratio: 1/1;"
-                ></video>
+                ><track kind="captions" /></video>
                 <div class="absolute inset-0 border-2 border-white rounded-lg pointer-events-none"></div>
             </div>
             <p class="text-sm text-gray-600 mt-3 text-center">
