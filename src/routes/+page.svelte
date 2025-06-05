@@ -116,8 +116,6 @@
                 if (isRecording) {
                     recordingSensorData = [...recordingSensorData, data.data];
                 }
-                
-                console.log('Desktop: Received accelerometer data:', data.data);
             } else if (data.type === 'heartbeat') {
                 console.log('Desktop: Received heartbeat');
             }
@@ -289,8 +287,6 @@
         if (isRecording) {
             recordingSensorData = [...recordingSensorData, newData];
         }
-        
-        console.log('Desktop: Received micro:bit data:', newData);
     }
 
     function handleMicroBitConnectionChange(connected: boolean) {
