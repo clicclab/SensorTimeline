@@ -288,7 +288,6 @@
                 <ActionButtons 
                     {connection}
                     {peer}
-                    onSendMessage={handleSendMessage}
                     onDisconnect={handleDisconnect}
                 />
                 

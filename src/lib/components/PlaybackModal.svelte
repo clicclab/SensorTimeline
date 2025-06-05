@@ -73,7 +73,12 @@
     function formatTime(seconds: number): string {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+        if (mins >= 1) {
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            return `00:${secs.toString().padStart(2, '0')}.${Math.floor((seconds % 1) * 100).toString().padStart(2, '0')}`;
+        }
     }
 
     // Setup video URL when recording changes
@@ -145,11 +150,11 @@
                             <input 
                                 type="range" 
                                 min="0" 
-                                max={recording.duration / 1000}
-                                value={currentTime / 1000}
+                                max={recording.duration}
+                                value={currentTime}
                                 oninput={(e) => {
                                     const target = e.target as HTMLInputElement;
-                                    seekTo(Number(target.value));
+                                    seekTo(Number(target.value) / 1000);
                                 }}
                                 class="w-full"
                             />
