@@ -28,7 +28,9 @@ npm run dev
 This will start a local development server.
 
 ### Desktop Interface
-Navigate to the app in your browser. If you are hosting the app locally, it will typically be available at `http://localhost:5173`.
+Navigate to the app in your browser. 
+The GitHub Pages deployment is available at `https://gsteinltu.github.io/SensorTimeline/`.
+If you are hosting the app locally, it will typically be available at `http://localhost:5173`.
 
 The desktop interface provides two input source options:
 
@@ -41,7 +43,8 @@ The desktop interface provides two input source options:
 #### Mobile Device (WebRTC)
 1. Select "Mobile Device" as your input source
 2. You will see a QR code that you can scan from the mobile page
-3. The mobile page is available at `http://localhost:5173/mobile`
+3. The mobile page is available at `https://gsteinltu.github.io/SensorTimeline/mobile`
+   - If you are running the app locally, use `http://localhost:5173/mobile`
 4. Scan the QR code or manually enter the peer ID to establish connection
 5. Once connected, the app will display real-time sensor data from your mobile device
 
