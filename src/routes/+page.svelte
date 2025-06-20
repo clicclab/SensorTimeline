@@ -44,18 +44,6 @@
 
     let otherId: string = $state('');
 
-    // Debug effect to track connection state
-    $effect(() => {
-        console.log('Main page - connection state changed:', {
-            connection: !!connection,
-            peerId,
-            peerStatus,
-            otherId,
-            isReceivingData,
-            dataHistoryLength: dataHistory.length
-        });
-    });
-
     // Event handlers
     function handleIdChange(id: string) {
         otherId = id;

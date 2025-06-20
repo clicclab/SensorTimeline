@@ -18,17 +18,6 @@
 
     let otherId: string = $state('');
 
-    // Debug effect to track connection state
-    $effect(() => {
-        console.log('Mobile: Connection state changed:', {
-            connection: !!connection,
-            peerId,
-            peerStatus,
-            isStreaming,
-            permissionGranted
-        });
-    });
-
     // Request accelerometer permission
     async function requestAccelerometerPermission() {
         try {
