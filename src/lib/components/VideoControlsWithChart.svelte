@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { onMount } from "svelte";
+
     type Props = {
         isPlaying: boolean;
         currentTime: number; // ms
@@ -29,12 +31,26 @@
     // Chart dimensions
     const width = 600;
     const height = 80;
-    const margin = 20;
 
-    // Compute chart points
+    let svgEl: SVGSVGElement;
+    let actualWidth = $state(width);
+
+    onMount(() => {
+        if (svgEl) {
+            const updateWidth = () => {
+                actualWidth = svgEl.clientWidth;
+            };
+            updateWidth();
+            const resizeObserver = new ResizeObserver(updateWidth);
+            resizeObserver.observe(svgEl);
+            return () => resizeObserver.disconnect();
+        }
+    });
+
+    // Compute chart points, scale t to actualWidth
     let points = $derived(
         sensorData.map((d) => ({
-            t: ((d.timestamp - recordingStartTime) / duration) * width,
+            t: ((d.timestamp - recordingStartTime) / duration) * actualWidth,
             x: d.x,
             y: d.y,
             z: d.z,
@@ -56,7 +72,7 @@
     }
 
     // Current time marker
-    let markerX = $derived((currentTime / duration) * width);
+    let markerX = $derived((currentTime / duration) * actualWidth);
 </script>
 
 <div class="flex items-center space-x-3">
@@ -72,58 +88,65 @@
             min="0"
             max={duration}
             value={currentTime}
-            oninput={(e) => onSeek(Number(e?.target.value || 0) / 1000)}
+            oninput={(e) => onSeek(Number((e.target as HTMLInputElement).value || 0) / 1000)}
             class="w-full"
         />
-        <svg {width} {height} class="w-full mt-1">
-            <!-- X Axis -->
-            <line
-                x1="0"
-                y1={height}
-                x2={width}
-                y2={height}
-                stroke="#ccc"
-                stroke-width="1"
-            />
-            <!-- Y Axis (optional) -->
-            <line
-                x1="0"
-                y1="0"
-                x2="0"
-                y2={height}
-                stroke="#eee"
-                stroke-width="1"
-            />
-            <!-- X Line -->
-            <polyline
-                fill="none"
-                stroke="#3b82f6"
-                stroke-width="2"
-                points={points.map((p) => `${p.t},${scaleY(p.x)}`).join(" ")}
-            />
-            <!-- Y Line -->
-            <polyline
-                fill="none"
-                stroke="#10b981"
-                stroke-width="2"
-                points={points.map((p) => `${p.t},${scaleY(p.y)}`).join(" ")}
-            />
-            <!-- Z Line -->
-            <polyline
-                fill="none"
-                stroke="#a21caf"
-                stroke-width="2"
-                points={points.map((p) => `${p.t},${scaleY(p.z)}`).join(" ")}
-            />
-            <!-- Current time marker -->
-            <line
-                x1={markerX}
-                y1="0"
-                x2={markerX}
-                y2={height}
-                stroke="#ef4444"
-                stroke-width="2"
-            />
+        <svg
+            bind:this={svgEl}
+            viewBox={`0 0 ${actualWidth} ${height}`}
+            height={height}
+            class="w-full mt-1"
+        >
+            <g>
+                <!-- X Axis -->
+                <line
+                    x1="0"
+                    y1={height}
+                    x2={actualWidth}
+                    y2={height}
+                    stroke="#ccc"
+                    stroke-width="1"
+                />
+                <!-- Y Axis (optional) -->
+                <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2={height}
+                    stroke="#eee"
+                    stroke-width="1"
+                />
+                <!-- X Line -->
+                <polyline
+                    fill="none"
+                    stroke="#3b82f6"
+                    stroke-width="2"
+                    points={points.map((p) => `${p.t},${scaleY(p.x)}`).join(" ")}
+                />
+                <!-- Y Line -->
+                <polyline
+                    fill="none"
+                    stroke="#10b981"
+                    stroke-width="2"
+                    points={points.map((p) => `${p.t},${scaleY(p.y)}`).join(" ")}
+                />
+                <!-- Z Line -->
+                <polyline
+                    fill="none"
+                    stroke="#a21caf"
+                    stroke-width="2"
+                    points={points.map((p) => `${p.t},${scaleY(p.z)}`).join(" ")}
+                />
+                <!-- Current time marker -->
+                <line
+                    x1={(currentTime / duration) * actualWidth}
+                    y1="0"
+                    x2={(currentTime / duration) * actualWidth}
+                    y2={height}
+                    stroke="#ef4444"
+                    stroke-width="2"
+                />
+            </g>
         </svg>
     </div>
     <span class="text-sm text-gray-600 font-mono">
