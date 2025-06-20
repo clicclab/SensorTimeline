@@ -23,19 +23,28 @@
     let currentSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
     let currentReading: {x: number, y: number, z: number, timestamp: number} | null = null;
     let currentTimelinePosition = 0; // Position in the timeline (0-1)
+    let videoDuration = 0; // ms
+    let videoReady = false;
 
     // Sync sensor data with video playback
     function updateSensorData() {
         if (!recording || !videoElement) return;
 
-        const videoCurrentTime = videoElement.currentTime * 1000; // Convert to ms
+        // Get video duration in ms (prefer video element's duration if finite)
+        if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
+            videoDuration = videoElement.duration * 1000;
+        } else {
+            videoDuration = recording.duration;
+        }
+
+        const videoCurrentTime = videoElement.currentTime * 1000; // ms
         const absoluteTime = recording.startTime + videoCurrentTime;
         
         // Show all sensor data from the entire recording
         currentSensorData = recording.sensorData;
         
         // Calculate timeline position (0-1) for highlighting current position
-        currentTimelinePosition = videoCurrentTime / recording.duration;
+        currentTimelinePosition = videoCurrentTime / videoDuration;
         
         // Find the closest sensor reading to current time
         let closestReading = null;
@@ -91,12 +100,12 @@
     }
 
     onMount(() => {
-        // Update sensor data every 100ms during playback
+        // Update sensor data every 50ms during playback
         playbackInterval = setInterval(() => {
             if (isPlaying) {
                 updateSensorData();
             }
-        }, 100);
+        }, 50);
     });
 
     onDestroy(() => {
@@ -128,49 +137,74 @@
                 <div class="relative">
                     <video 
                         bind:this={videoElement}
+                        preload="metadata"
                         src={videoUrl}
                         class="w-full aspect-video bg-gray-900 rounded-lg object-cover"
                         onplay={() => { isPlaying = true; }}
                         onpause={() => { isPlaying = false; }}
                         ontimeupdate={updateSensorData}
-                        onloadedmetadata={updateSensorData}
+                        onloadedmetadata={() => {
+                            console.log('Video metadata loaded, duration:', videoElement.duration);
+                            videoReady = true;
+                            if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
+                                videoDuration = videoElement.duration * 1000;
+                            }
+                            updateSensorData();
+                        }}
+                        ondurationchange={() => {
+                            console.log('Video duration changed:', videoElement.duration);
+                            if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
+                                videoDuration = videoElement.duration * 1000;
+                            } else {
+                                videoElement.currentTime = Math.max((recording.endTime - recording.startTime) / 1000 - 0.25, 0); // Set to end time minus a small buffer
+                                setTimeout(() => {
+                                    videoElement.currentTime = 0;
+                                }, 50);
+                            }
+                        }}
                     ><track kind="captions" /></video>
 
-                    <!-- Video Controls with Chart -->
-                    <VideoControlsWithChart
-                        isPlaying={isPlaying}
-                        currentTime={currentTime}
-                        duration={recording.duration}
-                        formatTime={formatTime}
-                        onToggle={togglePlayback}
-                        onSeek={seekTo}
-                        sensorData={currentSensorData}
-                        recordingStartTime={recording.startTime}
-                    />
+                    {#if videoReady}
+                        <!-- Video Controls with Chart -->
+                        <VideoControlsWithChart
+                            isPlaying={isPlaying}
+                            currentTime={currentTime}
+                            duration={videoDuration}
+                            formatTime={formatTime}
+                            onToggle={togglePlayback}
+                            onSeek={seekTo}
+                            sensorData={currentSensorData}
+                            recordingStartTime={recording.startTime}
+                        />
+                    {:else}
+                        <div class="flex items-center justify-center h-32"><span>Loading video metadata…</span></div>
+                    {/if}
                 </div>
 
 
                 <!-- Recording Info -->
-                <div class="bg-gray-50 rounded-lg p-3">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                            <div class="text-gray-500">Start Time</div>
-                            <div class="font-mono">{new Date(recording.startTime).toLocaleString()}</div>
-                        </div>
-                        <div>
-                            <div class="text-gray-500">Duration</div>
-                            <div class="font-mono">{formatTime(recording.duration / 1000)}</div>
-                        </div>
-                        <div>
-                            <div class="text-gray-500">Sensor Readings</div>
-                            <div class="font-mono">{recording.sensorData.length}</div>
-                        </div>
-                        <div>
-                            <div class="text-gray-500">Video Size</div>
-                            <div class="font-mono">{(recording.videoBlob.size / (1024 * 1024)).toFixed(1)} MB</div>
+                {#if videoReady}
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <div class="text-gray-500">Start Time</div>
+                                <div class="font-mono">{new Date(recording.startTime).toLocaleString()}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500">Duration</div>
+                                <div class="font-mono">{Number.isFinite(videoDuration) && videoDuration > 0 ? formatTime(videoDuration / 1000) : formatTime(recording.duration / 1000)}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500">Sensor Readings</div>
+                                <div class="font-mono">{recording.sensorData.length}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500">Video Size</div>
+                                <div class="font-mono">{(recording.videoBlob.size / (1024 * 1024)).toFixed(1)} MB</div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                {/if}
             </div>
         </div>
     </div>

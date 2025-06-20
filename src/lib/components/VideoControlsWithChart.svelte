@@ -70,9 +70,6 @@
     function scaleY(val: number) {
         return height - ((val - minVal) / range) * height;
     }
-
-    // Current time marker
-    let markerX = $derived((currentTime / duration) * actualWidth);
 </script>
 
 <div class="flex items-center space-x-3">
