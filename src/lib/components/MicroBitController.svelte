@@ -1,6 +1,6 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { connect, disconnect, isConnected, getDeviceName, setAccelerometerDataCallback, setDisconnectedCallback, setConnectedCallback } from "$lib/microBit";
+    import { connect, disconnect, getDeviceName, setAccelerometerDataCallback, setDisconnectedCallback, setConnectedCallback } from "$lib/microBit";
 
     interface Props {
         onDataReceived: (x: number, y: number, z: number) => void;

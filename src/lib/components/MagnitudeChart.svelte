@@ -2,12 +2,17 @@
     import { onMount, onDestroy } from 'svelte';
     import * as Plotly from 'plotly.js-dist';
 
-    export let data: Array<{x: number, y: number, z: number, timestamp: number}> = [];
-    export let maxDataPoints: number = 50;
-    export let recordingStartTime: number | undefined = undefined;
+    interface Props {
+        data?: Array<{x: number, y: number, z: number, timestamp: number}>;
+        maxDataPoints?: number;
+        recordingStartTime?: number;
+        currentVideoTime?: number;
+    }
+
+    let { data = [], maxDataPoints = 50, recordingStartTime, currentVideoTime }: Props = $props();
 
     let plotDiv: HTMLDivElement;
-    let plotInitialized = false;
+    let plotInitialized = $state(false);
 
     function resetZoom() {
         if (plotDiv && plotInitialized) {
@@ -155,9 +160,10 @@
     });
 
     // Reactive statement to update chart when data changes
-    $: if (plotInitialized && data) {
-        updateChart();
-    }
+    $effect(() => { if (plotInitialized && data) {
+            updateChart();
+        }
+    });
 </script>
 
 <div class="bg-white rounded-lg p-4 shadow-sm">
@@ -174,7 +180,7 @@
             </div>
             {#if recordingStartTime !== undefined}
                 <button 
-                    on:click={resetZoom}
+                    onclick={resetZoom}
                     class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border transition-colors"
                     disabled={!plotInitialized}
                 >

@@ -1,15 +1,18 @@
 <script lang="ts">
-    export let recordings: Array<{
-        id: string;
-        startTime: number;
-        endTime: number;
-        videoBlob: Blob;
-        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
-        duration: number;
-    }> = [];
-    
-    export let onDeleteRecording: ((id: string) => void) | undefined = undefined;
-    export let onPlayRecording: ((recording: any) => void) | undefined = undefined;
+    type Props = {
+        recordings?: Array<{
+            id: string;
+            startTime: number;
+            endTime: number;
+            videoBlob: Blob;
+            sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+            duration: number;
+        }>;
+        onDeleteRecording?: (id: string) => void;
+        onPlayRecording?: (recording: any) => void;
+    };
+
+    let { recordings = [], onDeleteRecording, onPlayRecording }: Props = $props();
 
     function formatDuration(ms: number): string {
         const seconds = Math.floor(ms / 1000);
