@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import AccelerometerChart from './AccelerometerChart.svelte';
-    import MagnitudeChart from './MagnitudeChart.svelte';
+    import VideoControlsWithChart from './VideoControlsWithChart.svelte';
 
     export let recording: {
         id: string;
@@ -137,84 +136,19 @@
                         onloadedmetadata={updateSensorData}
                     ><track kind="captions" /></video>
 
-                    <!-- Video Controls -->
-                    <div class="mt-2 flex items-center space-x-3">
-                        <button 
-                            onclick={togglePlayback}
-                            class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-                        >
-                            {isPlaying ? '⏸️' : '▶️'}
-                        </button>
-                        
-                        <div class="flex-1">
-                            <input 
-                                type="range" 
-                                min="0" 
-                                max={recording.duration}
-                                value={currentTime}
-                                oninput={(e) => {
-                                    const target = e.target as HTMLInputElement;
-                                    seekTo(Number(target.value) / 1000);
-                                }}
-                                class="w-full"
-                            />
-                        </div>
-                        
-                        <span class="text-sm text-gray-600 font-mono">
-                            {formatTime(currentTime / 1000)} / {formatTime(recording.duration / 1000)}
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Current Sensor Reading -->
-                {#if currentReading}
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-sm font-medium text-gray-500 mb-1">X-Axis</div>
-                            <div class="text-xl font-mono text-blue-600">
-                                {currentReading.x.toFixed(3)}
-                            </div>
-                            <div class="text-xs text-gray-400">m/s²</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-sm font-medium text-gray-500 mb-1">Y-Axis</div>
-                            <div class="text-xl font-mono text-green-600">
-                                {currentReading.y.toFixed(3)}
-                            </div>
-                            <div class="text-xs text-gray-400">m/s²</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-sm font-medium text-gray-500 mb-1">Z-Axis</div>
-                            <div class="text-xl font-mono text-purple-600">
-                                {currentReading.z.toFixed(3)}
-                            </div>
-                            <div class="text-xs text-gray-400">m/s²</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-sm font-medium text-gray-500 mb-1">Magnitude</div>
-                            <div class="text-xl font-mono text-red-600">
-                                {Math.sqrt(currentReading.x**2 + currentReading.y**2 + currentReading.z**2).toFixed(3)}
-                            </div>
-                            <div class="text-xs text-gray-400">m/s²</div>
-                        </div>
-                    </div>
-                {/if}
-
-                <!-- Charts showing all sensor data -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <AccelerometerChart 
-                        data={currentSensorData} 
-                        maxDataPoints={200} 
+                    <!-- Video Controls with Chart -->
+                    <VideoControlsWithChart
+                        isPlaying={isPlaying}
+                        currentTime={currentTime}
+                        duration={recording.duration}
+                        formatTime={formatTime}
+                        onToggle={togglePlayback}
+                        onSeek={seekTo}
+                        sensorData={currentSensorData}
                         recordingStartTime={recording.startTime}
-                        currentVideoTime={currentTime}
-                    />
-                    <MagnitudeChart 
-                        data={currentSensorData} 
-                        maxDataPoints={200} 
-                        recordingStartTime={recording.startTime}
-                        currentVideoTime={currentTime}
                     />
                 </div>
+
 
                 <!-- Recording Info -->
                 <div class="bg-gray-50 rounded-lg p-3">
