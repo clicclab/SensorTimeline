@@ -106,9 +106,13 @@
         // Clamp selection to maxSelectionLength
         if (selectStart !== null) {
             const pxPerMs = actualWidth / duration;
-            const maxPx = maxSelectionLength * pxPerMs;
-            if (Math.abs(nextEnd - selectStart) > maxPx) {
-                nextEnd = selectStart + Math.sign(nextEnd - selectStart) * maxPx;
+
+            if (maxSelectionLength) {
+                // Ensure nextEnd is within maxSelectionLength from selectStart
+                const maxPx = maxSelectionLength * pxPerMs;
+                if (Math.abs(nextEnd - selectStart) > maxPx) {
+                    nextEnd = selectStart + Math.sign(nextEnd - selectStart) * maxPx;
+                }
             }
         }
         selectEnd = nextEnd;
@@ -123,9 +127,11 @@
         // Clamp selection to maxSelectionLength
         if (selectStart !== null) {
             const pxPerMs = actualWidth / duration;
-            const maxPx = maxSelectionLength * pxPerMs;
-            if (Math.abs(nextEnd - selectStart) > maxPx) {
-                nextEnd = selectStart + Math.sign(nextEnd - selectStart) * maxPx;
+            if (maxSelectionLength){
+                const maxPx = maxSelectionLength * pxPerMs;
+                if (Math.abs(nextEnd - selectStart) > maxPx) {
+                    nextEnd = selectStart + Math.sign(nextEnd - selectStart) * maxPx;
+                }
             }
         }
         selectEnd = nextEnd;
@@ -133,7 +139,7 @@
         // Check min selection length
         if (selectStart !== null && selectEnd !== null) {
             const pxPerMs = actualWidth / duration;
-            const minPx = minSelectionLength * pxPerMs;
+            const minPx = (minSelectionLength ?? 0) * pxPerMs;
             if (Math.abs(selectEnd - selectStart) < minPx) {
                 selectStart = null;
                 selectEnd = null;
