@@ -170,6 +170,23 @@
         if (!sel) return null;
         return Math.abs(sel.t1 - sel.t0);
     }
+
+    // Saved selections
+    let savedSelections = $state<Array<{ t0: number; t1: number; label: string }>>([]);
+    let saveClass: string = $state('class A');
+    const classOptions = ['class A', 'class B'];
+
+    function saveSelection() {
+        const sel = getSelectionTimestamps();
+        if (!sel) return;
+        savedSelections = [
+            ...savedSelections,
+            { t0: Math.min(sel.t0, sel.t1), t1: Math.max(sel.t0, sel.t1), label: saveClass }
+        ];
+        selectStart = null;
+        selectEnd = null;
+        hasSelection = false;
+    }
 </script>
 
 <div class="flex items-center space-x-3">
@@ -273,12 +290,41 @@
             <b>Selected:</b> {formatTime(getSelectionTimestamps().t0 / 1000)} → {formatTime(getSelectionTimestamps().t1 / 1000)}
             <span style="opacity:0.7;">({formatTime(getSelectionDuration() / 1000)} duration)</span>
         </div>
-        <button
-            onclick={() => { selectStart = null; selectEnd = null; hasSelection = false; }}
-            style="margin-top:0.5em; background:#3b82f6; color:white; border:none; border-radius:0.3em; padding:0.2em 0.8em; cursor:pointer; font-size:0.95em;"
-        >
-            Clear selection
-        </button>
+        <div style="margin-top:0.5em;">
+            <label style="margin-right:0.5em;">Class:</label>
+            <select bind:value={saveClass} style="font-size:0.95em;">
+                {#each classOptions as opt}
+                    <option value={opt}>{opt}</option>
+                {/each}
+            </select>
+            <button
+                onclick={saveSelection}
+                style="margin-left:0.7em; background:#10b981; color:white; border:none; border-radius:0.3em; padding:0.2em 0.8em; cursor:pointer; font-size:0.95em;"
+            >
+                Save selection
+            </button>
+            <button
+                onclick={() => { selectStart = null; selectEnd = null; hasSelection = false; }}
+                style="margin-left:0.7em; background:#3b82f6; color:white; border:none; border-radius:0.3em; padding:0.2em 0.8em; cursor:pointer; font-size:0.95em;"
+            >
+                Clear selection
+            </button>
+        </div>
+    </div>
+{/if}
+
+{#if savedSelections.length > 0}
+    <div style="margin-top:1em;">
+        <b>Saved selections:</b>
+        <ul style="margin:0.5em 0 0 0.5em; padding:0; list-style:disc inside;">
+            {#each savedSelections as sel, i}
+                <li style="margin-bottom:0.2em;">
+                    <span style="color:#3b82f6;">{formatTime(sel.t0 / 1000)} → {formatTime(sel.t1 / 1000)}</span>
+                    <span style="margin-left:0.7em; color:#10b981; font-weight:bold;">{sel.label}</span>
+                    <button onclick={() => savedSelections = savedSelections.filter((_, j) => j !== i)} style="margin-left:0.7em; color:#ef4444; background:none; border:none; cursor:pointer; font-size:0.95em;">✕</button>
+                </li>
+            {/each}
+        </ul>
     </div>
 {/if}
 
