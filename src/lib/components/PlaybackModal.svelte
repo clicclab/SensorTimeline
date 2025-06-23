@@ -2,29 +2,32 @@
     import { onMount, onDestroy } from 'svelte';
     import VideoControlsWithChart from './VideoControlsWithChart.svelte';
 
-    export let recording: {
-        id: string;
-        startTime: number;
-        endTime: number;
-        videoBlob: Blob;
-        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
-        duration: number;
-    } | null = null;
-    
-    export let onClose: (() => void) | undefined = undefined;
+    type Props = {
+        recording: {
+            id: string;
+            startTime: number;
+            endTime: number;
+            videoBlob: Blob;
+            sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+            duration: number;
+        } | null;
+        onClose?: () => void;
+    };
 
-    let videoElement: HTMLVideoElement;
-    let isPlaying = false;
-    let currentTime = 0;
-    let videoUrl = '';
+    let { recording, onClose = () => {} }: Props = $props();
+
+    let videoElement: HTMLVideoElement | null = $state(null);
+    let isPlaying = $state(false);
+    let currentTime = $state(0); // Current playback time in seconds
+    let videoUrl = $state<string>('');
     let playbackInterval: ReturnType<typeof setInterval> | null = null;
     
     // Full sensor data and current position
-    let currentSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+    let currentSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
     let currentReading: {x: number, y: number, z: number, timestamp: number} | null = null;
-    let currentTimelinePosition = 0; // Position in the timeline (0-1)
-    let videoDuration = 0; // ms
-    let videoReady = false;
+    let currentTimelinePosition = $state(0); // Position in the timeline (0-1)
+    let videoDuration = $state(0); // Duration in milliseconds
+    let videoReady = $state(false); // Whether video metadata is ready
 
     // Sync sensor data with video playback
     function updateSensorData() {
@@ -89,15 +92,20 @@
         }
     }
 
-    // Setup video URL when recording changes
-    $: if (recording?.videoBlob) {
-        if (videoUrl) {
-            URL.revokeObjectURL(videoUrl);
+    // Setup video URL when recording changes (Svelte 5 style)
+    let prevBlob: Blob | null = null;
+    $effect(() => {
+        if (recording?.videoBlob !== prevBlob) {
+            if (videoUrl) {
+                URL.revokeObjectURL(videoUrl);
+                videoUrl = '';
+            }
+            if (recording?.videoBlob) {
+                videoUrl = URL.createObjectURL(recording.videoBlob);
+            }
+            prevBlob = recording?.videoBlob ?? null;
         }
-        videoUrl = URL.createObjectURL(recording.videoBlob);
-        // Initialize with all sensor data
-        currentSensorData = recording.sensorData;
-    }
+    });
 
     onMount(() => {
         // Update sensor data every 50ms during playback
@@ -144,20 +152,22 @@
                         onpause={() => { isPlaying = false; }}
                         ontimeupdate={updateSensorData}
                         onloadedmetadata={() => {
-                            console.log('Video metadata loaded, duration:', videoElement.duration);
+                            console.log('Video metadata loaded, duration:', videoElement?.duration);
                             videoReady = true;
-                            if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
+                            if (videoElement && Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
                                 videoDuration = videoElement.duration * 1000;
                             }
                             updateSensorData();
                         }}
                         ondurationchange={() => {
-                            console.log('Video duration changed:', videoElement.duration);
-                            if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
-                                videoDuration = videoElement.duration * 1000;
+                            if (!videoElement) return;
+                            console.log('Video duration changed:', videoElement?.duration);
+                            if (Number.isFinite(videoElement?.duration) && videoElement?.duration > 0) {
+                                videoDuration = videoElement?.duration * 1000;
                             } else {
                                 videoElement.currentTime = Math.max((recording.endTime - recording.startTime) / 1000 - 0.5, 0); // Set to end time minus a small buffer
                                 setTimeout(() => {
+                                    if(!videoElement) return;
                                     videoElement.currentTime = 0;
                                 }, 100);
                             }
@@ -175,6 +185,7 @@
                             onSeek={seekTo}
                             sensorData={currentSensorData}
                             recordingStartTime={recording.startTime}
+                            savedSelections={[]}
                         />
                     {:else}
                         <div class="flex items-center justify-center h-32"><span>Loading video metadata…</span></div>
