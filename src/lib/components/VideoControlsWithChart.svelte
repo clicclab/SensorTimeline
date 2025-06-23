@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import SelectionChart from "$lib/components/SelectionChart.svelte";
 
     type Props = {
         isPlaying: boolean;
@@ -193,6 +194,9 @@
         selectEnd = null;
         hasSelection = false;
     }
+
+    // Export savedSelections for parent access
+    export { savedSelections };
 </script>
 
 <div class="flex items-center space-x-3">
@@ -211,6 +215,7 @@
             oninput={(e) => onSeek(Number((e.target as HTMLInputElement).value || 0) / 1000)}
             class="w-full"
         />
+        <!-- Use the original SVG for selection/interaction, not SelectionChart -->
         <svg
             bind:this={svgEl}
             viewBox={`0 0 ${actualWidth} ${height}`}
@@ -320,17 +325,33 @@
 {/if}
 
 {#if savedSelections.length > 0}
-    <div style="margin-top:1em;">
-        <b>Saved selections:</b>
-        <ul style="margin:0.5em 0 0 0.5em; padding:0; list-style:disc inside;">
-            {#each savedSelections as sel, i}
-                <li style="margin-bottom:0.2em;">
-                    <span style="color:#3b82f6;">{formatTime(sel.t0 / 1000)} → {formatTime(sel.t1 / 1000)}</span>
-                    <span style="margin-left:0.7em; color:#10b981; font-weight:bold;">{sel.label}</span>
-                    <button onclick={() => savedSelections = savedSelections.filter((_, j) => j !== i)} style="margin-left:0.7em; color:#ef4444; background:none; border:none; cursor:pointer; font-size:0.95em;">✕</button>
-                </li>
-            {/each}
-        </ul>
+    <div style="margin-top:2em;">
+        <b>Saved selections by class:</b>
+        {#each classOptions as className}
+            {#if savedSelections.filter(s => s.label === className).length > 0}
+                <div style="margin-top:1em;">
+                    <div style="font-weight:bold; color:{className === 'class A' ? '#3b82f6' : '#10b981'};">{className}</div>
+                    <ul style="margin:0.5em 0 0 0.5em; padding:0; list-style:disc inside;">
+                        {#each savedSelections.filter(s => s.label === className) as sel, i}
+                            <li style="margin-bottom:0.2em;">
+                                <span style="color:#3b82f6;">{formatTime(sel.t0 / 1000)} → {formatTime(sel.t1 / 1000)}</span>
+                                <button onclick={() => savedSelections = savedSelections.filter((s, j) => s !== sel)} style="margin-left:0.7em; color:#ef4444; background:none; border:none; cursor:pointer; font-size:0.95em;">✕</button>
+                            </li>
+                        {/each}
+                    </ul>
+                    <SelectionChart
+                        sensorData={sensorData}
+                        recordingStartTime={recordingStartTime}
+                        duration={duration}
+                        selections={savedSelections.filter(s => s.label === className)}
+                        currentTime={currentTime}
+                        formatTime={formatTime}
+                        width={600}
+                        height={60}
+                    />
+                </div>
+            {/if}
+        {/each}
     </div>
 {/if}
 
