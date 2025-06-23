@@ -93,6 +93,10 @@
     function onSvgMouseMove(e: MouseEvent) {
         if (!isSelecting) return;
         selectEnd = svgXFromEvent(e);
+        // Seek video to current drag position
+        // Use the latest position (selectEnd)
+        const t = (selectEnd / actualWidth) * duration;
+        onSeek(t / 1000); // onSeek expects seconds
     }
 
     function onSvgMouseUp(e: MouseEvent) {
