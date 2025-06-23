@@ -156,10 +156,10 @@
                             if (Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
                                 videoDuration = videoElement.duration * 1000;
                             } else {
-                                videoElement.currentTime = Math.max((recording.endTime - recording.startTime) / 1000 - 0.25, 0); // Set to end time minus a small buffer
+                                videoElement.currentTime = Math.max((recording.endTime - recording.startTime) / 1000 - 0.5, 0); // Set to end time minus a small buffer
                                 setTimeout(() => {
                                     videoElement.currentTime = 0;
-                                }, 50);
+                                }, 100);
                             }
                         }}
                     ><track kind="captions" /></video>

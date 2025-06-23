@@ -70,6 +70,45 @@
     function scaleY(val: number) {
         return height - ((val - minVal) / range) * height;
     }
+
+    // Selection state (make reactive)
+    let isSelecting = $state(false);
+    let selectStart: number | null = $state(null); // in px
+    let selectEnd: number | null = $state(null); // in px
+
+    function svgXFromEvent(e: MouseEvent) {
+        const rect = svgEl.getBoundingClientRect();
+        return Math.max(0, Math.min(actualWidth, e.clientX - rect.left));
+    }
+
+    function onSvgMouseDown(e: MouseEvent) {
+        console.log('SVG mousedown', e.clientX, e.clientY); // Debug log
+        isSelecting = true;
+        selectStart = svgXFromEvent(e);
+        selectEnd = selectStart;
+        window.addEventListener("mousemove", onSvgMouseMove);
+        window.addEventListener("mouseup", onSvgMouseUp);
+    }
+
+    function onSvgMouseMove(e: MouseEvent) {
+        if (!isSelecting) return;
+        selectEnd = svgXFromEvent(e);
+    }
+
+    function onSvgMouseUp(e: MouseEvent) {
+        if (!isSelecting) return;
+        selectEnd = svgXFromEvent(e);
+        isSelecting = false;
+        window.removeEventListener("mousemove", onSvgMouseMove);
+        window.removeEventListener("mouseup", onSvgMouseUp);
+        // Optionally, emit selection event here
+    }
+
+    function getSelectionRange() {
+        if (selectStart === null || selectEnd === null) return null;
+        const [a, b] = [selectStart, selectEnd].sort((a, b) => a - b);
+        return { x: a, width: b - a };
+    }
 </script>
 
 <div class="flex items-center space-x-3">
@@ -93,6 +132,8 @@
             viewBox={`0 0 ${actualWidth} ${height}`}
             height={height}
             class="w-full mt-1"
+            onmousedown={onSvgMouseDown}
+            style="touch-action:none; user-select:none;"
         >
             <g>
                 <!-- X Axis -->
@@ -113,6 +154,21 @@
                     stroke="#eee"
                     stroke-width="1"
                 />
+                <!-- Selection Rectangle -->
+                {#if getSelectionRange()}
+                    {#key selectStart + '-' + selectEnd}
+                        <rect
+                            x={getSelectionRange().x}
+                            y="0"
+                            width={getSelectionRange().width}
+                            height={height}
+                            fill="#3b82f6"
+                            fill-opacity="0.15"
+                            stroke="#3b82f6"
+                            stroke-width="1"
+                        />
+                    {/key}
+                {/if}
                 <!-- X Line -->
                 <polyline
                     fill="none"
@@ -150,6 +206,9 @@
         {formatTime(currentTime / 1000)} / {formatTime(duration / 1000)}
     </span>
 </div>
+{#if isSelecting}
+    <div style="color: #3b82f6; font-size: 0.9em;">Selecting: {selectStart?.toFixed(1)} → {selectEnd?.toFixed(1)}</div>
+{/if}
 
 <style>
     svg {
