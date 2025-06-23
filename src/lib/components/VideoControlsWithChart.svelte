@@ -15,6 +15,8 @@
             timestamp: number;
         }>;
         recordingStartTime: number;
+        minSelectionLength?: number; // ms
+        maxSelectionLength?: number; // ms
     };
     
     let {
@@ -26,7 +28,13 @@
         onSeek,
         sensorData,
         recordingStartTime,
+        minSelectionLength,
+        maxSelectionLength,
     }: Props = $props();
+
+    // Set default min/max selection length (ms)
+    minSelectionLength = minSelectionLength ?? 250;
+    maxSelectionLength = maxSelectionLength ?? 1000;
 
     // Chart dimensions
     const width = 600;
@@ -94,18 +102,48 @@
 
     function onSvgMouseMove(e: MouseEvent) {
         if (!isSelecting) return;
-        selectEnd = svgXFromEvent(e);
+        let nextEnd = svgXFromEvent(e);
+        // Clamp selection to maxSelectionLength
+        if (selectStart !== null) {
+            const pxPerMs = actualWidth / duration;
+            const maxPx = maxSelectionLength * pxPerMs;
+            if (Math.abs(nextEnd - selectStart) > maxPx) {
+                nextEnd = selectStart + Math.sign(nextEnd - selectStart) * maxPx;
+            }
+        }
+        selectEnd = nextEnd;
         // Seek video to current drag position
-        // Use the latest position (selectEnd)
         const t = (selectEnd / actualWidth) * duration;
         onSeek(t / 1000); // onSeek expects seconds
     }
 
     function onSvgMouseUp(e: MouseEvent) {
         if (!isSelecting) return;
-        selectEnd = svgXFromEvent(e);
+        let nextEnd = svgXFromEvent(e);
+        // Clamp selection to maxSelectionLength
+        if (selectStart !== null) {
+            const pxPerMs = actualWidth / duration;
+            const maxPx = maxSelectionLength * pxPerMs;
+            if (Math.abs(nextEnd - selectStart) > maxPx) {
+                nextEnd = selectStart + Math.sign(nextEnd - selectStart) * maxPx;
+            }
+        }
+        selectEnd = nextEnd;
         isSelecting = false;
-        hasSelection = selectStart !== null && selectEnd !== null && selectStart !== selectEnd;
+        // Check min selection length
+        if (selectStart !== null && selectEnd !== null) {
+            const pxPerMs = actualWidth / duration;
+            const minPx = minSelectionLength * pxPerMs;
+            if (Math.abs(selectEnd - selectStart) < minPx) {
+                selectStart = null;
+                selectEnd = null;
+                hasSelection = false;
+            } else {
+                hasSelection = true;
+            }
+        } else {
+            hasSelection = false;
+        }
         window.removeEventListener("mousemove", onSvgMouseMove);
         window.removeEventListener("mouseup", onSvgMouseUp);
         // Optionally, emit selection event here
