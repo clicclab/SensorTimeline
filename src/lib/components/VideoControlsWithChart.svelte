@@ -18,6 +18,7 @@
         recordingStartTime: number;
         minSelectionLength?: number; // ms
         maxSelectionLength?: number; // ms
+        savedSelections: Array<{ t0: number; t1: number; label: string }>;
     };
     
     let {
@@ -31,6 +32,7 @@
         recordingStartTime,
         minSelectionLength,
         maxSelectionLength,
+        savedSelections = $bindable([]),
     }: Props = $props();
 
     // Set default min/max selection length (ms)
@@ -179,7 +181,6 @@
     }
 
     // Saved selections
-    let savedSelections = $state<Array<{ t0: number; t1: number; label: string }>>([]);
     let saveClass: string = $state('class A');
     const classOptions = ['class A', 'class B'];
 
