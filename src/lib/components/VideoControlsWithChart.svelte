@@ -109,6 +109,15 @@
         const [a, b] = [selectStart, selectEnd].sort((a, b) => a - b);
         return { x: a, width: b - a };
     }
+
+    // Helper to get selection timestamps (in ms, relative to recordingStartTime)
+    function getSelectionTimestamps() {
+        if (selectStart === null || selectEnd === null) return null;
+        const [a, b] = [selectStart, selectEnd].sort((x, y) => x - y);
+        const t0 = (a / actualWidth) * duration;
+        const t1 = (b / actualWidth) * duration;
+        return { t0, t1 };
+    }
 </script>
 
 <div class="flex items-center space-x-3">
@@ -206,8 +215,12 @@
         {formatTime(currentTime / 1000)} / {formatTime(duration / 1000)}
     </span>
 </div>
-{#if isSelecting}
-    <div style="color: #3b82f6; font-size: 0.9em;">Selecting: {selectStart?.toFixed(1)} → {selectEnd?.toFixed(1)}</div>
+{#if isSelecting && selectStart !== null && selectEnd !== null}
+    {#if getSelectionTimestamps()}
+        <div style="color: #3b82f6; font-size: 0.9em;">
+            Selecting: {formatTime(getSelectionTimestamps().t0 / 1000)} → {formatTime(getSelectionTimestamps().t1 / 1000)}
+        </div>
+    {/if}
 {/if}
 
 <style>
