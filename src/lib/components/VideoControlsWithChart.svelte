@@ -75,6 +75,7 @@
     let isSelecting = $state(false);
     let selectStart: number | null = $state(null); // in px
     let selectEnd: number | null = $state(null); // in px
+    let hasSelection = $state(false); // true if a selection exists
 
     function svgXFromEvent(e: MouseEvent) {
         const rect = svgEl.getBoundingClientRect();
@@ -86,6 +87,7 @@
         isSelecting = true;
         selectStart = svgXFromEvent(e);
         selectEnd = selectStart;
+        hasSelection = false;
         window.addEventListener("mousemove", onSvgMouseMove);
         window.addEventListener("mouseup", onSvgMouseUp);
     }
@@ -103,6 +105,7 @@
         if (!isSelecting) return;
         selectEnd = svgXFromEvent(e);
         isSelecting = false;
+        hasSelection = selectStart !== null && selectEnd !== null && selectStart !== selectEnd;
         window.removeEventListener("mousemove", onSvgMouseMove);
         window.removeEventListener("mouseup", onSvgMouseUp);
         // Optionally, emit selection event here
@@ -121,6 +124,13 @@
         const t0 = (a / actualWidth) * duration;
         const t1 = (b / actualWidth) * duration;
         return { t0, t1 };
+    }
+
+    // Helper to get selection duration (in ms)
+    function getSelectionDuration() {
+        const sel = getSelectionTimestamps();
+        if (!sel) return null;
+        return Math.abs(sel.t1 - sel.t0);
     }
 </script>
 
@@ -219,12 +229,19 @@
         {formatTime(currentTime / 1000)} / {formatTime(duration / 1000)}
     </span>
 </div>
-{#if isSelecting && selectStart !== null && selectEnd !== null}
-    {#if getSelectionTimestamps()}
-        <div style="color: #3b82f6; font-size: 0.9em;">
-            Selecting: {formatTime(getSelectionTimestamps().t0 / 1000)} → {formatTime(getSelectionTimestamps().t1 / 1000)}
+{#if hasSelection && getSelectionTimestamps()}
+    <div style="color: #3b82f6; font-size: 0.9em; margin-top: 0.5em; background: #f0f6ff; border-radius: 0.4em; padding: 0.5em 0.8em; display: inline-block;">
+        <div>
+            <b>Selected:</b> {formatTime(getSelectionTimestamps().t0 / 1000)} → {formatTime(getSelectionTimestamps().t1 / 1000)}
+            <span style="opacity:0.7;">({formatTime(getSelectionDuration() / 1000)} duration)</span>
         </div>
-    {/if}
+        <button
+            onclick={() => { selectStart = null; selectEnd = null; hasSelection = false; }}
+            style="margin-top:0.5em; background:#3b82f6; color:white; border:none; border-radius:0.3em; padding:0.2em 0.8em; cursor:pointer; font-size:0.95em;"
+        >
+            Clear selection
+        </button>
+    </div>
 {/if}
 
 <style>
