@@ -12,6 +12,7 @@
     import RecordingsList from "$lib/components/RecordingsList.svelte";
     import PlaybackModal from "$lib/components/PlaybackModal.svelte";
     import MicroBitController from "$lib/components/MicroBitController.svelte";
+    import { page } from '$app/stores';
 
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
@@ -288,7 +289,13 @@
         }
     }
 
-    // Event handlers
+    let useMockMicroBit = $state(false);
+
+    // Check for ?mockmicrobit=1 in the URL
+    if (browser) {
+        const params = new URLSearchParams(window.location.search);
+        useMockMicroBit = params.get('mockmicrobit') === '1';
+    }
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
@@ -383,6 +390,7 @@
                     <MicroBitController 
                         onDataReceived={handleMicroBitData}
                         onConnectionChange={handleMicroBitConnectionChange}
+                        useMock={useMockMicroBit}
                     />
                 {/if}
                 

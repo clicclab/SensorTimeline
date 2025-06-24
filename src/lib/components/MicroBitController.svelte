@@ -1,13 +1,16 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import { connect, disconnect, getDeviceName, setAccelerometerDataCallback, setDisconnectedCallback, setConnectedCallback } from "$lib/microBit";
+    import { onMount } from "svelte";
 
     interface Props {
         onDataReceived: (x: number, y: number, z: number) => void;
         onConnectionChange: (connected: boolean) => void;
+        useMock?: boolean;
     }
 
-    let { onDataReceived, onConnectionChange }: Props = $props();
+    let { onDataReceived, onConnectionChange, useMock = false }: Props = $props();
+
+    let microBitApi: any = null;
 
     let isDeviceConnected: boolean = $state(false);
     let deviceName: string | null = $state(null);
@@ -15,37 +18,45 @@
     let error: string | null = $state(null);
 
     // Check if Web Bluetooth is supported
-    let isBluetoothSupported: boolean = $state(false);
+    let isBluetoothSupported: boolean = $state(useMock);
 
-    if (browser) {
-        isBluetoothSupported = 'bluetooth' in navigator;
-        
-        // Set up callbacks for micro:bit events
-        setAccelerometerDataCallback((x: number, y: number, z: number) => {
-            // Convert from micro:bit units (milli-g) to m/s²
-            // micro:bit reports in milli-g, so divide by 1000 to get g, then multiply by 9.81 for m/s²
-            const xMs2 = (x / 1000) * 9.81;
-            const yMs2 = (y / 1000) * 9.81;
-            const zMs2 = (z / 1000) * 9.81;
+    onMount(() => {
+        if (browser) {
+            isBluetoothSupported = useMock || 'bluetooth' in navigator;
             
-            onDataReceived(xMs2, yMs2, zMs2);
-        });
+            (async () => {
+                microBitApi = useMock
+                    ? await import("$lib/microBitMock")
+                    : await import("$lib/microBit");
+                
+                // Set up callbacks for micro:bit events
+                microBitApi.setAccelerometerDataCallback((x: number, y: number, z: number) => {
+                    // Convert from micro:bit units (milli-g) to m/s²
+                    // micro:bit reports in milli-g, so divide by 1000 to get g, then multiply by 9.81 for m/s²
+                    const xMs2 = (x / 1000) * 9.81;
+                    const yMs2 = (y / 1000) * 9.81;
+                    const zMs2 = (z / 1000) * 9.81;
+                    
+                    onDataReceived(xMs2, yMs2, zMs2);
+                });
 
-        setDisconnectedCallback(() => {
-            isDeviceConnected = false;
-            deviceName = null;
-            onConnectionChange(false);
-            error = "Device disconnected";
-        });
+                microBitApi.setDisconnectedCallback(() => {
+                    isDeviceConnected = false;
+                    deviceName = null;
+                    onConnectionChange(false);
+                    error = "Device disconnected";
+                });
 
-        setConnectedCallback(() => {
-            isDeviceConnected = true;
-            deviceName = getDeviceName();
-            onConnectionChange(true);
-            error = null;
-            isConnecting = false;
-        });
-    }
+                microBitApi.setConnectedCallback(() => {
+                    isDeviceConnected = true;
+                    deviceName = microBitApi.getDeviceName();
+                    onConnectionChange(true);
+                    error = null;
+                    isConnecting = false;
+                });
+            })();
+        }
+    });
 
     async function handleConnect() {
         if (!browser || !isBluetoothSupported) {
@@ -57,7 +68,7 @@
         error = null;
 
         try {
-            await connect();
+            await microBitApi.connect();
             // Connection success is handled by the setConnectedCallback
         } catch (err) {
             console.error("Failed to connect to micro:bit:", err);
@@ -71,7 +82,7 @@
 
     function handleDisconnect() {
         try {
-            disconnect();
+            microBitApi.disconnect();
             isDeviceConnected = false;
             deviceName = null;
             onConnectionChange(false);
