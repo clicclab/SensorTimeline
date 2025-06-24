@@ -217,6 +217,7 @@
             class="w-full"
         />
         <!-- Use the original SVG for selection/interaction, not SelectionChart -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <svg
             bind:this={svgEl}
             viewBox={`0 0 ${actualWidth} ${height}`}
@@ -224,6 +225,7 @@
             class="w-full mt-1"
             onmousedown={onSvgMouseDown}
             style="touch-action:none; user-select:none;"
+            aria-label="Sensor data chart"
         >
             <g>
                 <!-- X Axis -->
@@ -248,9 +250,9 @@
                 {#if getSelectionRange()}
                     {#key selectStart + '-' + selectEnd}
                         <rect
-                            x={getSelectionRange().x}
+                            x={getSelectionRange()?.x}
                             y="0"
-                            width={getSelectionRange().width}
+                            width={getSelectionRange()?.width}
                             height={height}
                             fill="#3b82f6"
                             fill-opacity="0.15"
@@ -299,8 +301,8 @@
 {#if hasSelection && getSelectionTimestamps()}
     <div style="color: #3b82f6; font-size: 0.9em; margin-top: 0.5em; background: #f0f6ff; border-radius: 0.4em; padding: 0.5em 0.8em; display: inline-block;">
         <div>
-            <b>Selected:</b> {formatTime(getSelectionTimestamps().t0 / 1000)} → {formatTime(getSelectionTimestamps().t1 / 1000)}
-            <span style="opacity:0.7;">({formatTime(getSelectionDuration() / 1000)} duration)</span>
+            <b>Selected:</b> {formatTime(getSelectionTimestamps()?.t0 ?? 0 / 1000)} → {formatTime(getSelectionTimestamps()?.t1 ?? 0 / 1000)}  
+            <span style="opacity:0.7;">({formatTime(getSelectionDuration() ?? 0 / 1000)} duration)</span>
         </div>
         <div style="margin-top:0.5em;">
             <label style="margin-right:0.5em;">Class:</label>

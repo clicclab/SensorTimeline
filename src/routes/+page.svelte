@@ -12,8 +12,7 @@
     import RecordingsList from "$lib/components/RecordingsList.svelte";
     import PlaybackModal from "$lib/components/PlaybackModal.svelte";
     import MicroBitController from "$lib/components/MicroBitController.svelte";
-    import { page } from '$app/stores';
-
+    
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
     let peerStatus: string | null = $state(null);
