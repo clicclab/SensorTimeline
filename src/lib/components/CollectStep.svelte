@@ -197,6 +197,7 @@ function handlePlayRecording(recording: any) {
 }
 function handleClosePlayback() {
     selectedRecording = null;
+    recordings = [...recordings];
 }
 
 // micro:bit event handlers
