@@ -2,10 +2,7 @@
     import { browser } from "$app/environment";
     import Peer, { type DataConnection } from "peerjs";
     import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
-    import QRScanner from "$lib/components/QRScanner.svelte";
     import PeerStatus from "$lib/components/PeerStatus.svelte";
-    import ConnectionForm from "$lib/components/ConnectionForm.svelte";
-    import ActionButtons from "$lib/components/ActionButtons.svelte";
     import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import WebcamRecorder from "$lib/components/WebcamRecorder.svelte";
@@ -13,6 +10,7 @@
     import PlaybackModal from "$lib/components/PlaybackModal.svelte";
     import MicroBitController from "$lib/components/MicroBitController.svelte";
     import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
+    import ConnectionSection from "$lib/components/ConnectionSection.svelte";
     import { LocalStore } from "$lib/localStore";
     import { onMount } from "svelte";
     
@@ -20,7 +18,6 @@
     let peerId: string | null = $state(null);
     let peerStatus: string | null = $state(null);
     let connection: DataConnection | null = $state.raw(null);
-    let showScanner: boolean = $state(false);
     let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
     let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
     let isReceivingData: boolean = $state(false);
@@ -163,19 +160,6 @@
         } else {
             console.log('Cannot connect: peer or otherId missing', { peer: !!peer, otherId });
         }
-    }
-
-    function handleScanRequest() {
-        showScanner = true;
-    }
-
-    function handleScanResult(result: string) {
-        otherId = result;
-        showScanner = false;
-    }
-
-    function handleScanClose() {
-        showScanner = false;
     }
 
     function handleIncomingData(rawData: any) {
@@ -394,44 +378,32 @@
                 </span>
             </h1>
             
-            <!-- Status Section -->
-            {#if inputSource === 'webrtc'}
-                <div class="mb-8 p-6 bg-gray-50 rounded-xl">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <PeerStatus {peerId} {peerStatus} />
-                        <QRCodeDisplay {peerId} />
-                    </div>
-                </div>
-            {/if}
-            
             <!-- Input Source Selection -->
             <InputSourceSelector
                 inputSource={inputSource}
                 onChange={(val) => (inputSource = val)}
             />
             
-            <!-- Connection Section -->
             <div class="space-y-6">
+                <!-- Connection Section -->
                 {#if inputSource === 'webrtc'}
-                    <ConnectionForm 
-                        {otherId}
-                        {peer}
-                        {connection}
+                    <div class="mb-8 p-6 bg-gray-50 rounded-xl">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <PeerStatus {peerId} {peerStatus} />
+                            <QRCodeDisplay {peerId} />
+                        </div>
+                    </div>
+                    <ConnectionSection
+                        inputSource={inputSource}
+                        otherId={otherId}
+                        peer={peer}
+                        connection={connection}
                         onIdChange={handleIdChange}
                         onConnect={handleConnect}
-                        onScanRequest={handleScanRequest}
-                    />
-
-                    <QRScanner 
-                        isOpen={showScanner}
-                        onScan={handleScanResult}
-                        onClose={handleScanClose}
-                    />
-                    
-                    <ActionButtons 
-                        {connection}
-                        {peer}
                         onDisconnect={handleDisconnect}
+                        onMicroBitData={handleMicroBitData}
+                        onMicroBitConnectionChange={handleMicroBitConnectionChange}
+                        useMockMicroBit={useMockMicroBit}
                     />
                 {:else if inputSource === 'microbit'}
                     <MicroBitController 
