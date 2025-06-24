@@ -45,7 +45,11 @@
     
     {#if peerStatus === 'Connected'}
         <div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p class="text-green-800 text-sm">🎉 Ready to connect to mobile! Share your Peer ID or scan the QR code.</p>
+            <p class="text-green-800 text-sm">🎉 Ready to connect to mobile! Share your Peer ID or scan the QR code.
+
+                <br />
+                <span class="font-semibold">Tip:</span> Go to <a href="{window.location.origin}/mobile" class="text-blue-600 hover:underline">/mobile</a> on your mobile device to connect.
+            </p>
         </div>
     {:else}
         <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
