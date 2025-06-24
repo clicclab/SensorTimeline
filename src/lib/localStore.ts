@@ -7,6 +7,27 @@ import { browser } from "$app/environment";
 export class LocalStore<T> {
   private constructor(public key: string, public value: T) {}
 
+  static async get<T>(key: string, defaultValue: T | null = null): Promise<T | null> {
+    if (key.length === 0) throw new Error("Key cannot be an empty string");
+    if (!(browser && "storage" in navigator && "getDirectory" in navigator.storage)) {
+      throw new Error(
+        "StorageManager API is not available in this environment",
+      );
+    }
+
+    const dir = await navigator.storage.getDirectory();
+    const fileHandle = await dir.getFileHandle(key).catch(() => null);
+
+    if (fileHandle) {
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      return JSON.parse(text);
+    } else {
+      console.warn(`[LocalStore] File not found for key: ${key}`);
+      return defaultValue;
+    }
+  }
+
   static async create<T>(key: string, initialValue: T): Promise<LocalStore<T>> {
     navigator.storage.persist().then((persistent) => {
       if (persistent) {

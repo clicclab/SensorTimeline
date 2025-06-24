@@ -12,9 +12,10 @@
             duration: number;
         } | null;
         onClose?: () => void;
+        savedSelections?: Array<{start: number, end: number}>;
     };
 
-    let { recording, onClose = () => {} }: Props = $props();
+    let { recording, onClose = () => {}, savedSelections = $bindable([]) }: Props = $props();
 
     let videoElement: HTMLVideoElement | null = $state(null);
     let isPlaying = $state(false);
@@ -179,7 +180,7 @@
                             onSeek={seekTo}
                             sensorData={currentSensorData}
                             recordingStartTime={recording.startTime}
-                            savedSelections={[]}
+                            {savedSelections}
                         />
                     {:else}
                         <div class="flex items-center justify-center h-32"><span>Loading video metadata…</span></div>

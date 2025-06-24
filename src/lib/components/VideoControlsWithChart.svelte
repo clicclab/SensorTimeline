@@ -33,11 +33,10 @@
         recordingStartTime,
         minSelectionLength,
         maxSelectionLength,
+        savedSelections = $bindable([]),
     }: Props = $props();
 
     let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
-
-    let savedSelections: Array<{ t0: number; t1: number; label: string }> = $state([]);
 
     $effect(async () => {
         savedSelections;

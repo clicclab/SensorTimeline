@@ -56,6 +56,7 @@ let recordings: Array<{
 
 // Playback modal state
 let selectedRecording: any = $state(null);
+let savedSelections: Array<{start: number, end: number}> = $state([]);
 
 // On mount: initialize recordings store and load
 if (browser) {
@@ -305,11 +306,13 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
             {recordings}
             onDeleteRecording={handleDeleteRecording}
             onPlayRecording={handlePlayRecording}
+            {savedSelections}
         />
     {/if}
     <PlaybackModal 
         recording={selectedRecording}
         onClose={handleClosePlayback}
+        {savedSelections}
     />
     {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
         <div class="bg-gray-50 rounded-xl p-6">
