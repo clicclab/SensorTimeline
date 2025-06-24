@@ -1,44 +1,70 @@
-import { browser } from '$app/environment';
+import { browser } from "$app/environment";
 
 /**
- * A simple local storage wrapper that uses $state to manage state.
- * It automatically syncs the state with localStorage.
+ * A local storage wrapper using the StorageManager API (navigator.storage.getDirectory).
+ * Throws if StorageManager is not available.
  */
 export class LocalStore<T> {
-  value: T;
-  key: string;
+  private constructor(public key: string, public value: T) {}
 
-  /**
-   * @param key The key under which the value will be stored in localStorage.
-   * @param initialValue The initial value to be stored. If the key already exists in localStorage, this value will not be overwritten.
-   */
-  constructor(key: string, initialValue: T) {
-    if (key.length === 0) {
-      throw new Error('Key cannot be an empty string');
+  static async create<T>(key: string, initialValue: T): Promise<LocalStore<T>> {
+    navigator.storage.persist().then((persistent) => {
+      if (persistent) {
+        console.log("Storage will not be cleared except by explicit user action");
+      } else {
+        console.log("Storage may be cleared by the UA under storage pressure.");
+      }
+    });
+
+    if (key.length === 0) throw new Error("Key cannot be an empty string");
+    const store = new LocalStore<T>(key, initialValue);
+    store.key = key;
+    if (
+      !(browser && "storage" in navigator &&
+        "getDirectory" in navigator.storage)
+    ) {
+      throw new Error(
+        "StorageManager API is not available in this environment",
+      );
     }
-
-    this.key = key;
+    
+    store.value = initialValue;
 
     if (browser) {
-      const item = localStorage.getItem(key);
-      if (item) {
-        this.value = JSON.parse(item);
+      await store.init(initialValue);
+    }
+
+    return store;
+  }
+
+  private async init(initialValue: T) {
+    try {
+      const dir = await navigator.storage.getDirectory();
+      if (await dir.getFileHandle(this.key).catch(() => null)) {
+        const fileHandle = await dir.getFileHandle(this.key);
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        this.value = JSON.parse(text);
       } else {
         this.value = initialValue;
       }
-    } else {
-        this.value = initialValue;
+    } catch (_e) {
+      this.value = initialValue;
     }
   }
 
   /**
-   * Sets the value and updates localStorage.
+   * Sets the value and updates storage.
    * @param newValue The new value to be set.
    */
-  set(newValue: T) {
+  async set(newValue: T) {
     this.value = newValue;
     if (browser) {
-      localStorage.setItem(this.key, JSON.stringify(newValue));
+      const dir = await navigator.storage.getDirectory();
+      const handle = await dir.getFileHandle(this.key, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(newValue));
+      await writable.close();
     }
   }
 
@@ -49,8 +75,4 @@ export class LocalStore<T> {
   get(): T {
     return this.value;
   }
-}
-
-export function localStore<T>(key: string, value: T) {
-  return new LocalStore(key, value);
 }

@@ -35,15 +35,16 @@
         maxSelectionLength,
     }: Props = $props();
 
-    let selectionsStore = new LocalStore<Array<{ t0: number; t1: number; label: string }>>(
-        `saved-selections-${recordingStartTime}`,
-        [],
-    );
+    let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
 
-    let savedSelections: Array<{ t0: number; t1: number; label: string }> = $state(selectionsStore.get() || []);
+    let savedSelections: Array<{ t0: number; t1: number; label: string }> = $state([]);
 
-    $effect(() => {
-        selectionsStore.set(savedSelections);
+    $effect(async () => {
+        savedSelections;
+
+        if (!selectionsStore) return;
+
+        await selectionsStore.set(savedSelections);
     });
 
     // Set default min/max selection length (ms)
@@ -56,6 +57,15 @@
 
     let svgEl: SVGSVGElement;
     let actualWidth = $state(width);
+
+    onMount(async () => {
+        selectionsStore = await LocalStore.create<Array<{ t0: number; t1: number; label: string }>>(
+            `saved-selections-${recordingStartTime}`,
+            [],
+        );
+
+        savedSelections = await selectionsStore.get();
+    });
 
     onMount(() => {
         if (svgEl) {
