@@ -12,7 +12,7 @@
             duration: number;
         } | null;
         onClose?: () => void;
-        savedSelections?: Array<{start: number, end: number}>;
+        savedSelections?: Array<{t0: number, t1: number, label: string}>;
     };
 
     let { recording, onClose = () => {}, savedSelections = $bindable([]) }: Props = $props();

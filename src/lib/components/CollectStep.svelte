@@ -56,7 +56,7 @@ let recordings: Array<{
 
 // Playback modal state
 let selectedRecording: any = $state(null);
-let savedSelections: Array<{start: number, end: number}> = $state([]);
+let savedSelections: Array<{t0: number, t1: number, label: string}> = $state([]);
 
 // On mount: initialize recordings store and load
 if (browser) {

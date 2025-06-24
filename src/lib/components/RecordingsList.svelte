@@ -13,8 +13,9 @@
         onDeleteRecording?: (id: string) => void;
         onPlayRecording?: (recording: any) => void;
         savedSelections?: Array<{
-            start: number;
-            end: number;
+            t0: number;
+            t1: number;
+            label: string;
         }>;
     };
 
