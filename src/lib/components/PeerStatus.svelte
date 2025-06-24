@@ -48,7 +48,7 @@
             <p class="text-green-800 text-sm">🎉 Ready to connect to mobile! Share your Peer ID or scan the QR code.
 
                 <br />
-                <span class="font-semibold">Tip:</span> Go to <a href="{window.location.origin}/mobile" class="text-blue-600 hover:underline">/mobile</a> on your mobile device to connect.
+                <span class="font-semibold">Tip:</span> Go to <a href={`${window.location.origin}${window.location.pathname.replace(/\/?$/, '')}/mobile`} class="text-blue-600 hover:underline">/mobile</a> on your mobile device to connect.
             </p>
         </div>
     {:else}
