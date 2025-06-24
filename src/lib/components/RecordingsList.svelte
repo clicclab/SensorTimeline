@@ -1,5 +1,6 @@
 <script lang="ts">
     import { LocalStore } from "$lib/localStore";
+    import Sparkline from "$lib/components/ui/Sparkline.svelte";
 
     type Props = {
         recordings?: Array<{
@@ -28,17 +29,19 @@
         label: string;
     }> = $state([]);
 
-    $effect(async () => {
+    $effect(() => {
         recordings;
-        // Load labeled recordings from LocalStore
-        labeledRecordings = await loadLabeledRecordings();
+        loadLabeledRecordings().then(result => {
+            labeledRecordings = result;
+        });
     });
 
-    $effect(async () => {
+    $effect(() => {
         savedSelections;
         console.log('Saved selections updated:', savedSelections);
-        // Load labeled recordings from LocalStore
-        labeledRecordings = await loadLabeledRecordings();
+        loadLabeledRecordings().then(result => {
+            labeledRecordings = result;
+        });
     });
 
     let labeledRecordingsByClass: Record<string, Array<{
@@ -122,6 +125,25 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    function getLabeledSensorMagnitudes(labeled: { recordingStartTime: number; t0: number; t1: number; label: string }): number[] {
+        // Find the parent recording
+        const parent = recordings.find(r => r.startTime === labeled.recordingStartTime);
+        if (!parent) return [];
+        // Filter sensor data within t0-t1
+        const segment = parent.sensorData.filter(d => d.timestamp >= labeled.t0 && d.timestamp <= labeled.t1);
+        // Return magnitudes
+        return segment.map(d => Math.sqrt(d.x ** 2 + d.y ** 2 + d.z ** 2));
+    }
+
+    function getLabeledSensorData(labeled: { recordingStartTime: number; t0: number; t1: number; label: string }) {
+        const parent = recordings.find(r => r.startTime === labeled.recordingStartTime);
+        if (!parent) return [];
+        // If t0/t1 are relative, add recordingStartTime
+        const t0Abs = labeled.t0 < 1e12 ? labeled.recordingStartTime + labeled.t0 : labeled.t0;
+        const t1Abs = labeled.t1 < 1e12 ? labeled.recordingStartTime + labeled.t1 : labeled.t1;
+        return parent.sensorData.filter(d => d.timestamp >= t0Abs && d.timestamp <= t1Abs);
     }
 </script>
 
@@ -236,8 +258,11 @@
                                             <div class="font-medium text-sm">
                                                 {new Date(recording.recordingStartTime).toLocaleString()}
                                             </div>
-                                            <div class="text-xs text-gray-500">
+                                            <div class="text-xs text-gray-500 flex items-center gap-2">
                                                 {formatDuration(recording.t1 - recording.t0)}
+                                                <span class="inline-block">
+                                                    <Sparkline data={getLabeledSensorData(recording)} width={60} height={16} strokeWidth={2} />
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
