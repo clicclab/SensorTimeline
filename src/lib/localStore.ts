@@ -5,8 +5,8 @@ import { browser } from '$app/environment';
  * It automatically syncs the state with localStorage.
  */
 export class LocalStore<T> {
-  value = $state<T>() as T;
-  key = '';
+  value: T;
+  key: string;
 
   /**
    * @param key The key under which the value will be stored in localStorage.
@@ -29,12 +29,25 @@ export class LocalStore<T> {
     } else {
         this.value = initialValue;
     }
+  }
 
-    $effect(() => {
-      if (browser) {
-        localStorage.setItem(this.key, JSON.stringify(this.value));
-      }
-    });
+  /**
+   * Sets the value and updates localStorage.
+   * @param newValue The new value to be set.
+   */
+  set(newValue: T) {
+    this.value = newValue;
+    if (browser) {
+      localStorage.setItem(this.key, JSON.stringify(newValue));
+    }
+  }
+
+  /**
+   * Gets the current value.
+   * @returns The current value.
+   */
+  get(): T {
+    return this.value;
   }
 }
 

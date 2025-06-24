@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import SelectionChart from "$lib/components/SelectionChart.svelte";
+    import { LocalStore } from "$lib/localStore";
 
     type Props = {
         isPlaying: boolean;
@@ -32,8 +33,18 @@
         recordingStartTime,
         minSelectionLength,
         maxSelectionLength,
-        savedSelections = $bindable([]),
     }: Props = $props();
+
+    let selectionsStore = new LocalStore<Array<{ t0: number; t1: number; label: string }>>(
+        `saved-selections-${recordingStartTime}`,
+        [],
+    );
+
+    let savedSelections: Array<{ t0: number; t1: number; label: string }> = $state(selectionsStore.get() || []);
+
+    $effect(() => {
+        selectionsStore.set(savedSelections);
+    });
 
     // Set default min/max selection length (ms)
     minSelectionLength = minSelectionLength ?? 250;
@@ -195,9 +206,6 @@
         selectEnd = null;
         hasSelection = false;
     }
-
-    // Export savedSelections for parent access
-    export { savedSelections };
 </script>
 
 <div class="flex items-center space-x-3">
