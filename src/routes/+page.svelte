@@ -456,6 +456,7 @@
                 <WebcamRecorder 
                     onRecordingStart={handleRecordingStart}
                     onRecordingStop={handleRecordingStop}
+                    allowRecording={(inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected)}
                 />
                 
                 <!-- Recordings List -->

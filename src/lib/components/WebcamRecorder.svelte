@@ -5,6 +5,9 @@
     export let onRecordingStop: ((endTime: number, videoBlob: Blob) => void) | undefined = undefined;
     export let onRecordingData: ((timestamp: number) => void) | undefined = undefined;
 
+    // New prop: allowRecording
+    export let allowRecording: boolean = true;
+
     let videoElement: HTMLVideoElement;
     let stream: MediaStream | null = null;
     let mediaRecorder: MediaRecorder | null = null;
@@ -44,6 +47,8 @@
 
     // Start recording
     async function startRecording() {
+        if (!allowRecording) return;
+
         if (!stream || !hasPermission) {
             await requestWebcamAccess();
             if (!stream) return;
@@ -184,7 +189,7 @@
         {#if !isRecording}
             <button 
                 onclick={startRecording}
-                disabled={!hasPermission}
+                disabled={!hasPermission || !allowRecording}
                 class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
             >
                 <span>🔴</span>
