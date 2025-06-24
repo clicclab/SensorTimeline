@@ -9,7 +9,7 @@ import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
 import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 
-export type CollectStepProps = {
+type CollectStepProps = {
     inputSource: 'webrtc' | 'microbit';
     onInputSourceChange: (val: 'webrtc' | 'microbit') => void;
     peerId: string | null;
@@ -37,7 +37,7 @@ export type CollectStepProps = {
     stepForward: () => void;
 };
 
-let { inputSource, onInputSourceChange, peerId, peerStatus, otherId, peer, connection, onIdChange, onConnect, onDisconnect, onMicroBitData, onMicroBitConnectionChange, useMockMicroBit, isMicroBitConnected, onRecordingStart, onRecordingStop, allowRecording, recordings, onDeleteRecording, onPlayRecording, accelerometerData, dataHistory, isReceivingData, clearDataHistory, stepForward } = $props<CollectStepProps>();
+let { inputSource, onInputSourceChange, peerId, peerStatus, otherId, peer, connection, onIdChange, onConnect, onDisconnect, onMicroBitData, onMicroBitConnectionChange, useMockMicroBit, isMicroBitConnected, onRecordingStart, onRecordingStop, allowRecording, recordings, onDeleteRecording, onPlayRecording, accelerometerData, dataHistory, isReceivingData, clearDataHistory, stepForward }: CollectStepProps = $props();
 </script>
 
 <InputSourceSelector

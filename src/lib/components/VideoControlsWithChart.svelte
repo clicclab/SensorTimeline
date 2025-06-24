@@ -323,8 +323,8 @@
             <span style="opacity:0.7;">({formatTime(getSelectionDuration() ?? 0 / 1000)} duration)</span>
         </div>
         <div style="margin-top:0.5em;">
-            <label style="margin-right:0.5em;">Class:</label>
-            <select bind:value={saveClass} style="font-size:0.95em;">
+            <label for="class-select" style="margin-right:0.5em;">Class:</label>
+            <select id="class-select" bind:value={saveClass} style="font-size:0.95em;">
                 {#each classOptions as opt}
                     <option value={opt}>{opt}</option>
                 {/each}

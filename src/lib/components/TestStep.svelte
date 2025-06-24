@@ -1,8 +1,8 @@
 <script lang="ts">
-export type TestStepProps = {
+type TestStepProps = {
     stepBack: () => void;
 };
-let { stepBack } = $props<TestStepProps>();
+let { stepBack }: TestStepProps = $props();
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center">

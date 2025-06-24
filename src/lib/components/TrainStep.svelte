@@ -1,9 +1,10 @@
 <script lang="ts">
-export type TrainStepProps = {
+type TrainStepProps = {
     stepBack: () => void;
     stepForward: () => void;
 };
-let { stepBack, stepForward } = $props<TrainStepProps>();
+
+let { stepBack, stepForward }: TrainStepProps = $props();
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center">
