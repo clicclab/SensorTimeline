@@ -12,6 +12,7 @@
     import RecordingsList from "$lib/components/RecordingsList.svelte";
     import PlaybackModal from "$lib/components/PlaybackModal.svelte";
     import MicroBitController from "$lib/components/MicroBitController.svelte";
+    import { LocalStore } from "$lib/localStore";
     
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
@@ -32,6 +33,51 @@
     let isRecording: boolean = $state(false);
     let recordingStartTime: number = 0;
     let recordingSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+    // LocalStore for recordings
+    let recordingsStore = new LocalStore<Array<{
+        id: string;
+        startTime: number;
+        endTime: number;
+        videoBlob: Blob;
+        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+        duration: number;
+    }>>("saved-recordings", []);
+
+    // Helper: Convert Blob to base64 string
+    async function blobToBase64(blob: Blob): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    // Helper: Convert base64 string to Blob
+    function base64ToBlob(base64: string, mimeType: string): Blob {
+        const byteString = atob(base64.split(',')[1]);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        return new Blob([ab], { type: mimeType });
+    }
+
+    // Patch: Load recordings from LocalStore and rehydrate videoBlob
+    function loadRecordings(): Array<any> {
+        const raw = recordingsStore.get() || [];
+        return raw.map((rec: any) => {
+            if (rec.videoBlob && typeof rec.videoBlob === 'object' && rec.videoBlob.base64 && rec.videoBlob.type) {
+                return {
+                    ...rec,
+                    videoBlob: base64ToBlob(rec.videoBlob.base64, rec.videoBlob.type)
+                };
+            }
+            return rec;
+        });
+    }
+
     let recordings: Array<{
         id: string;
         startTime: number;
@@ -39,7 +85,20 @@
         videoBlob: Blob;
         sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
         duration: number;
-    }> = $state([]);
+    }> = $state(loadRecordings());
+
+    $effect(async () => {
+        // Store videoBlob as base64+type
+        const toStore = await Promise.all(recordings.map(async (rec) => {
+            if (rec.videoBlob instanceof Blob) {
+                const base64 = await blobToBase64(rec.videoBlob);
+                return { ...rec, videoBlob: { base64, type: rec.videoBlob.type } };
+            }
+            return rec;
+        }));
+        recordingsStore.set(toStore);
+    });
+
     let selectedRecording: any = $state(null);
 
     let otherId: string = $state('');
