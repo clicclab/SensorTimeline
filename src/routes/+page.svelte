@@ -1,16 +1,6 @@
 <script lang="ts">
     import { browser } from "$app/environment";
     import Peer, { type DataConnection } from "peerjs";
-    import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
-    import PeerStatus from "$lib/components/PeerStatus.svelte";
-    import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
-    import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
-    import WebcamRecorder from "$lib/components/WebcamRecorder.svelte";
-    import RecordingsList from "$lib/components/RecordingsList.svelte";
-    import PlaybackModal from "$lib/components/PlaybackModal.svelte";
-    import MicroBitController from "$lib/components/MicroBitController.svelte";
-    import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
-    import ConnectionSection from "$lib/components/ConnectionSection.svelte";
     import CollectStep from "$lib/components/CollectStep.svelte";
     import TrainStep from "$lib/components/TrainStep.svelte";
     import TestStep from "$lib/components/TestStep.svelte";
@@ -25,15 +15,11 @@
     let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
     let isReceivingData: boolean = $state(false);
 
-    // micro:bit connection state
-    let isMicroBitConnected: boolean = $state(false);
-
     // Input source selection
     let inputSource: 'webrtc' | 'microbit' = $state('microbit');
 
     // Recording state
     let isRecording: boolean = $state(false);
-    let recordingStartTime: number = 0;
     let recordingSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
 
     // LocalStore for recordings
@@ -114,57 +100,6 @@
         duration: number;
     }> = $state([]);
 
-    // Save recordings to storage
-    async function saveRecordings() {
-        if (!recordingsStore) return;
-        const toStore = await Promise.all(recordings.map(async (rec) => {
-            if (rec.videoBlob instanceof Blob) {
-                const base64 = await blobToBase64(rec.videoBlob);
-                return { ...rec, videoBlob: { base64, type: rec.videoBlob.type } };
-            }
-            return rec;
-        }));
-        await recordingsStore.set(toStore);
-    }
-
-    let selectedRecording: any = $state(null);
-
-    let otherId: string = $state('');
-
-    // Event handlers
-    function handleIdChange(id: string) {
-        otherId = id;
-    }
-
-    function handleConnect() {
-        if (peer && otherId) {
-            console.log('Attempting to connect to:', otherId);
-            const conn = peer.connect(otherId);
-            
-            conn.on('open', () => {
-                console.log('Outgoing connection opened to:', conn.peer);
-                console.log('Connection object:', conn);
-                connection = conn;
-            });
-            
-            conn.on('data', (data) => {
-                console.log('Received data:', data);
-                handleIncomingData(data);
-            });
-            
-            conn.on('close', () => {
-                console.log('Outgoing connection closed');
-                connection = null;
-            });
-            
-            conn.on('error', (err) => {
-                console.error('Connection error:', err);
-            });
-        } else {
-            console.log('Cannot connect: peer or otherId missing', { peer: !!peer, otherId });
-        }
-    }
-
     function handleIncomingData(rawData: any) {
         try {
             const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
@@ -190,83 +125,6 @@
         dataHistory = [];
         accelerometerData = null;
         isReceivingData = false;
-    }
-
-    // Recording handlers
-    function handleRecordingStart(startTime: number) {
-        isRecording = true;
-        recordingStartTime = startTime;
-        recordingSensorData = [];
-        console.log('Recording started at:', new Date(startTime));
-    }
-
-    function handleRecordingStop(endTime: number, videoBlob: Blob) {
-        isRecording = false;
-        
-        const newRecording = {
-            id: `recording-${Date.now()}`,
-            startTime: recordingStartTime,
-            endTime: endTime,
-            videoBlob: videoBlob,
-            sensorData: [...recordingSensorData],
-            duration: endTime - recordingStartTime
-        };
-        
-        recordings = [...recordings, newRecording];
-        recordingSensorData = [];
-        saveRecordings();
-        console.log('Recording saved:', newRecording);
-    }
-
-    function handleDeleteRecording(id: string) {
-        recordings = recordings.filter(r => r.id !== id);
-        saveRecordings();
-    }
-
-    function handlePlayRecording(recording: any) {
-        selectedRecording = recording;
-    }
-
-    function handleClosePlayback() {
-        selectedRecording = null;
-    }
-
-    function handleSendMessage() {
-        console.log('Attempting to send command, connection state:', {
-            connection: !!connection,
-            connectionType: connection?.type
-        });
-        
-        if (connection) {
-            try {
-                connection.send(JSON.stringify({
-                    type: 'command',
-                    action: 'ping',
-                    timestamp: Date.now()
-                }));
-                console.log('Command sent to mobile device');
-            } catch (error) {
-                console.error('Error sending command:', error);
-            }
-        } else {
-            console.log('Cannot send command: no connection');
-        }
-    }
-
-    function handleDisconnect() {
-        console.log('Desktop: Disconnecting...');
-        
-        // Clear data
-        clearDataHistory();
-        
-        if (connection) {
-            connection.close();
-            connection = null;
-        }
-        
-        // Note: Don't disconnect the peer entirely, just close the connection
-        // This allows for reconnection without reinitializing the peer
-        console.log('Desktop: Disconnected, ready for new connections');
     }
 
     // Initialize PeerJS when WebRTC mode is selected
@@ -337,32 +195,6 @@
         console.log('Input source changed to:', inputSource);
     });
 
-    // micro:bit event handlers
-    function handleMicroBitData(x: number, y: number, z: number) {
-        const timestamp = Date.now();
-        const newData = { x, y, z, timestamp };
-        
-        accelerometerData = newData;
-        dataHistory = [...dataHistory.slice(-99), newData]; // Keep last 100 readings
-        isReceivingData = true;
-        
-        // If recording, also add to recording sensor data
-        if (isRecording) {
-            recordingSensorData = [...recordingSensorData, newData];
-        }
-    }
-
-    function handleMicroBitConnectionChange(connected: boolean) {
-        isMicroBitConnected = connected;
-        
-        if (!connected) {
-            // Clear data when micro:bit disconnects
-            if (inputSource === 'microbit') {
-                clearDataHistory();
-            }
-        }
-    }
-
     let useMockMicroBit = $state(false);
 
     // Check for ?mockmicrobit=1 in the URL
@@ -372,7 +204,6 @@
     }
 
     // Step-based workflow state
-
     type Step = 'collect' | 'train' | 'test';
     let step: Step = $state('collect');
 
@@ -411,33 +242,7 @@
 
             <!-- Step Content -->
             {#if step === 'collect'}
-                <CollectStep
-                    inputSource={inputSource}
-                    onInputSourceChange={(val) => (inputSource = val)}
-                    peerId={peerId}
-                    peerStatus={peerStatus}
-                    otherId={otherId}
-                    peer={peer}
-                    connection={connection}
-                    onIdChange={handleIdChange}
-                    onConnect={handleConnect}
-                    onDisconnect={handleDisconnect}
-                    onMicroBitData={handleMicroBitData}
-                    onMicroBitConnectionChange={handleMicroBitConnectionChange}
-                    useMockMicroBit={useMockMicroBit}
-                    isMicroBitConnected={isMicroBitConnected}
-                    onRecordingStart={handleRecordingStart}
-                    onRecordingStop={handleRecordingStop}
-                    allowRecording={(inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected)}
-                    recordings={recordings}
-                    onDeleteRecording={handleDeleteRecording}
-                    onPlayRecording={handlePlayRecording}
-                    accelerometerData={accelerometerData}
-                    dataHistory={dataHistory}
-                    isReceivingData={isReceivingData}
-                    clearDataHistory={clearDataHistory}
-                    stepForward={() => (step = 'train')}
-                />
+                <CollectStep stepForward={() => (step = 'train')} />
             {:else if step === 'train'}
                 <TrainStep
                     stepBack={() => (step = 'collect')}
@@ -460,9 +265,4 @@
             </p>
         </div>
     </div>
-    <!-- Playback Modal -->
-    <PlaybackModal 
-        recording={selectedRecording}
-        onClose={handleClosePlayback}
-    />
 </div>

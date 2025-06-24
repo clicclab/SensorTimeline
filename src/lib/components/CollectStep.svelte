@@ -1,4 +1,7 @@
 <script lang="ts">
+import Peer, { type DataConnection } from "peerjs";
+import { browser } from "$app/environment";
+import { LocalStore } from "$lib/localStore";
 import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
 import ConnectionSection from "$lib/components/ConnectionSection.svelte";
 import MicroBitController from "$lib/components/MicroBitController.svelte";
@@ -8,41 +11,262 @@ import PeerStatus from "$lib/components/PeerStatus.svelte";
 import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
 import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
+import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 
-type CollectStepProps = {
-    inputSource: 'webrtc' | 'microbit';
-    onInputSourceChange: (val: 'webrtc' | 'microbit') => void;
-    peerId: string | null;
-    peerStatus: string | null;
-    otherId: string;
-    peer: any;
-    connection: any;
-    onIdChange: (id: string) => void;
-    onConnect: () => void;
-    onDisconnect: () => void;
-    onMicroBitData: (x: number, y: number, z: number) => void;
-    onMicroBitConnectionChange: (connected: boolean) => void;
-    useMockMicroBit: boolean;
-    isMicroBitConnected: boolean;
-    onRecordingStart: (startTime: number) => void;
-    onRecordingStop: (endTime: number, videoBlob: Blob) => void;
-    allowRecording: boolean;
-    recordings: Array<any>;
-    onDeleteRecording: (id: string) => void;
-    onPlayRecording: (rec: any) => void;
-    accelerometerData: {x: number, y: number, z: number, timestamp: number} | null;
-    dataHistory: Array<{x: number, y: number, z: number, timestamp: number}>;
-    isReceivingData: boolean;
-    clearDataHistory: () => void;
+// Props
+ type Props = {
     stepForward: () => void;
 };
+let { stepForward } = $props();
 
-let { inputSource, onInputSourceChange, peerId, peerStatus, otherId, peer, connection, onIdChange, onConnect, onDisconnect, onMicroBitData, onMicroBitConnectionChange, useMockMicroBit, isMicroBitConnected, onRecordingStart, onRecordingStop, allowRecording, recordings, onDeleteRecording, onPlayRecording, accelerometerData, dataHistory, isReceivingData, clearDataHistory, stepForward }: CollectStepProps = $props();
+// PeerJS state
+let peer: Peer | null = $state.raw(null);
+let peerId: string | null = $state(null);
+let peerStatus: string | null = $state(null);
+let connection: DataConnection | null = $state.raw(null);
+let otherId: string = $state('');
+
+// Accelerometer state
+let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
+let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
+let isReceivingData: boolean = $state(false);
+
+// micro:bit state
+let isMicroBitConnected: boolean = $state(false);
+let useMockMicroBit = $state(false);
+
+// Input source
+let inputSource: 'webrtc' | 'microbit' = $state('microbit');
+
+// Recording state
+let isRecording: boolean = $state(false);
+let recordingStartTime: number = 0;
+let recordingSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+
+// Recordings store
+let recordingsStore: LocalStore<any> | null = $state.raw(null);
+let recordings: Array<{
+    id: string;
+    startTime: number;
+    endTime: number;
+    videoBlob: Blob;
+    sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+    duration: number;
+}> = $state([]);
+
+// Playback modal state
+let selectedRecording: any = $state(null);
+
+// On mount: initialize recordings store and load
+if (browser) {
+    LocalStore.create<Array<{
+        id: string;
+        startTime: number;
+        endTime: number;
+        videoBlob: Blob;
+        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+        duration: number;
+    }>>("saved-recordings", []).then(store => {
+        recordingsStore = store;
+        recordings = loadRecordings();
+    });
+    // Check for ?mockmicrobit=1 in the URL
+    const params = new URLSearchParams(window.location.search);
+    useMockMicroBit = params.get('mockmicrobit') === '1';
+}
+
+// Helpers for blob encoding
+async function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+function base64ToBlob(base64: string, mimeType: string): Blob {
+    const byteString = atob(base64.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeType });
+}
+function loadRecordings(): Array<any> {
+    if (!recordingsStore) return [];
+    const raw = recordingsStore.get() || [];
+    return raw.map((rec: any) => {
+        if (rec.videoBlob && typeof rec.videoBlob === 'object' && rec.videoBlob.base64 && rec.videoBlob.type) {
+            return {
+                ...rec,
+                videoBlob: base64ToBlob(rec.videoBlob.base64, rec.videoBlob.type)
+            };
+        }
+        return rec;
+    });
+}
+async function saveRecordings() {
+    if (!recordingsStore) return;
+    const toStore = await Promise.all(recordings.map(async (rec) => {
+        if (rec.videoBlob instanceof Blob) {
+            const base64 = await blobToBase64(rec.videoBlob);
+            return { ...rec, videoBlob: { base64, type: rec.videoBlob.type } };
+        }
+        return rec;
+    }));
+    await recordingsStore.set(toStore);
+}
+
+// PeerJS connection handlers
+function handleIdChange(id: string) {
+    otherId = id;
+}
+function handleConnect() {
+    if (peer && otherId) {
+        const conn = peer.connect(otherId);
+        conn.on('open', () => {
+            connection = conn;
+        });
+        conn.on('data', (data) => {
+            handleIncomingData(data);
+        });
+        conn.on('close', () => {
+            connection = null;
+        });
+        conn.on('error', (err) => {
+            // Optionally handle error
+        });
+    }
+}
+function handleDisconnect() {
+    clearDataHistory();
+    if (connection) {
+        connection.close();
+        connection = null;
+    }
+}
+function handleIncomingData(rawData: any) {
+    try {
+        const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+        if (data.type === 'accelerometer' && data.data) {
+            accelerometerData = data.data;
+            dataHistory = [...dataHistory.slice(-99), data.data];
+            isReceivingData = true;
+            if (isRecording) {
+                recordingSensorData = [...recordingSensorData, data.data];
+            }
+        }
+    } catch (error) {
+        // Optionally handle error
+    }
+}
+function clearDataHistory() {
+    dataHistory = [];
+    accelerometerData = null;
+    isReceivingData = false;
+}
+
+// Recording handlers
+function handleRecordingStart(startTime: number) {
+    isRecording = true;
+    recordingStartTime = startTime;
+    recordingSensorData = [];
+}
+function handleRecordingStop(endTime: number, videoBlob: Blob) {
+    isRecording = false;
+    const newRecording = {
+        id: `recording-${Date.now()}`,
+        startTime: recordingStartTime,
+        endTime: endTime,
+        videoBlob: videoBlob,
+        sensorData: [...recordingSensorData],
+        duration: endTime - recordingStartTime
+    };
+    recordings = [...recordings, newRecording];
+    recordingSensorData = [];
+    saveRecordings();
+}
+function handleDeleteRecording(id: string) {
+    recordings = recordings.filter(r => r.id !== id);
+    saveRecordings();
+}
+function handlePlayRecording(recording: any) {
+    selectedRecording = recording;
+}
+function handleClosePlayback() {
+    selectedRecording = null;
+}
+
+// micro:bit event handlers
+function handleMicroBitData(x: number, y: number, z: number) {
+    const timestamp = Date.now();
+    const newData = { x, y, z, timestamp };
+    accelerometerData = newData;
+    dataHistory = [...dataHistory.slice(-99), newData];
+    isReceivingData = true;
+    if (isRecording) {
+        recordingSensorData = [...recordingSensorData, newData];
+    }
+}
+function handleMicroBitConnectionChange(connected: boolean) {
+    isMicroBitConnected = connected;
+    if (!connected && inputSource === 'microbit') {
+        clearDataHistory();
+    }
+}
+
+// PeerJS and inputSource effects
+$effect(() => {
+    if (browser && inputSource === 'webrtc' && !peer) {
+        const newPeer = new Peer();
+        peer = newPeer;
+        newPeer.on('open', id => {
+            peerStatus = 'Connected';
+            peerId = id;
+        });
+        newPeer.on("connection", (conn) => {
+            connection = conn;
+            conn.on("data", (data) => {
+                handleIncomingData(data);
+            });
+            conn.on("open", () => {
+                conn.send(JSON.stringify({
+                    type: 'welcome',
+                    message: 'Connected to desktop'
+                }));
+            });
+            conn.on('close', () => {
+                clearDataHistory();
+                connection = null;
+            });
+        });
+        newPeer.on('close', () => {
+            peerStatus = 'Disconnected';
+        });
+    } else if (inputSource !== 'webrtc' && peer) {
+        if (connection) {
+            connection.close();
+            connection = null;
+        }
+        peer.destroy();
+        peer = null;
+        peerId = null;
+        peerStatus = null;
+    }
+});
+$effect(() => {
+    clearDataHistory();
+});
+
+// Derived
+let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected));
+
 </script>
 
 <InputSourceSelector
     {inputSource}
-    onChange={onInputSourceChange}
+    onChange={(val) => (inputSource = val)}
 />
 <div class="space-y-6">
     {#if inputSource === 'webrtc'}
@@ -57,32 +281,36 @@ let { inputSource, onInputSourceChange, peerId, peerStatus, otherId, peer, conne
             {otherId}
             {peer}
             {connection}
-            onIdChange={onIdChange}
-            onConnect={onConnect}
-            onDisconnect={onDisconnect}
-            onMicroBitData={onMicroBitData}
-            onMicroBitConnectionChange={onMicroBitConnectionChange}
+            onIdChange={handleIdChange}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            onMicroBitData={handleMicroBitData}
+            onMicroBitConnectionChange={handleMicroBitConnectionChange}
             {useMockMicroBit}
         />
     {:else if inputSource === 'microbit'}
         <MicroBitController 
-            onDataReceived={onMicroBitData}
-            onConnectionChange={onMicroBitConnectionChange}
+            onDataReceived={handleMicroBitData}
+            onConnectionChange={handleMicroBitConnectionChange}
             useMock={useMockMicroBit}
         />
     {/if}
     <WebcamRecorder 
-        onRecordingStart={onRecordingStart}
-        onRecordingStop={onRecordingStop}
+        onRecordingStart={handleRecordingStart}
+        onRecordingStop={handleRecordingStop}
         {allowRecording}
     />
     {#if recordings.length > 0}
         <RecordingsList 
             {recordings}
-            onDeleteRecording={onDeleteRecording}
-            onPlayRecording={onPlayRecording}
+            onDeleteRecording={handleDeleteRecording}
+            onPlayRecording={handlePlayRecording}
         />
     {/if}
+    <PlaybackModal 
+        recording={selectedRecording}
+        onClose={handleClosePlayback}
+    />
     {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
         <div class="bg-gray-50 rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
@@ -102,21 +330,21 @@ let { inputSource, onInputSourceChange, peerId, peerStatus, otherId, peer, conne
                     <div class="bg-white rounded-lg p-4 shadow-sm">
                         <div class="text-sm font-medium text-gray-500 mb-1">X-Axis</div>
                         <div class="text-2xl font-mono text-blue-600">
-                            {accelerometerData.x.toFixed(3)}
+                            {accelerometerData.x?.toFixed(3)}
                         </div>
                         <div class="text-xs text-gray-400">m/s²</div>
                     </div>
                     <div class="bg-white rounded-lg p-4 shadow-sm">
                         <div class="text-sm font-medium text-gray-500 mb-1">Y-Axis</div>
                         <div class="text-2xl font-mono text-green-600">
-                            {accelerometerData.y.toFixed(3)}
+                            {accelerometerData.y?.toFixed(3)}
                         </div>
                         <div class="text-xs text-gray-400">m/s²</div>
                     </div>
                     <div class="bg-white rounded-lg p-4 shadow-sm">
                         <div class="text-sm font-medium text-gray-500 mb-1">Z-Axis</div>
                         <div class="text-2xl font-mono text-purple-600">
-                            {accelerometerData.z.toFixed(3)}
+                            {accelerometerData.z?.toFixed(3)}
                         </div>
                         <div class="text-xs text-gray-400">m/s²</div>
                     </div>
@@ -139,13 +367,13 @@ let { inputSource, onInputSourceChange, peerId, peerStatus, otherId, peer, conne
                         <div>
                             <div class="text-gray-500">Last Update</div>
                             <div class="font-mono">
-                                {new Date(accelerometerData.timestamp).toLocaleTimeString()}
+                                {accelerometerData.timestamp ? new Date(accelerometerData.timestamp).toLocaleTimeString() : ''}
                             </div>
                         </div>
                         <div>
                             <div class="text-gray-500">Magnitude</div>
                             <div class="font-mono">
-                                {Math.sqrt(accelerometerData.x**2 + accelerometerData.y**2 + accelerometerData.z**2).toFixed(3)}
+                                {accelerometerData.x !== undefined && accelerometerData.y !== undefined && accelerometerData.z !== undefined ? Math.sqrt(accelerometerData.x**2 + accelerometerData.y**2 + accelerometerData.z**2).toFixed(3) : ''}
                             </div>
                         </div>
                         <div>

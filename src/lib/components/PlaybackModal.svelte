@@ -164,12 +164,6 @@
                             console.log('Video duration changed:', videoElement?.duration);
                             if (Number.isFinite(videoElement?.duration) && videoElement?.duration > 0) {
                                 videoDuration = videoElement?.duration * 1000;
-                            } else {
-                                videoElement.currentTime = Math.max((recording.endTime - recording.startTime) / 1000 - 0.5, 0); // Set to end time minus a small buffer
-                                setTimeout(() => {
-                                    if(!videoElement) return;
-                                    videoElement.currentTime = 0;
-                                }, 100);
                             }
                         }}
                     ><track kind="captions" /></video>
