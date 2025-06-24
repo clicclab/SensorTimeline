@@ -40,15 +40,19 @@ export class LocalStore<T> {
   private async init(initialValue: T) {
     try {
       const dir = await navigator.storage.getDirectory();
-      if (await dir.getFileHandle(this.key).catch(() => null)) {
-        const fileHandle = await dir.getFileHandle(this.key);
+      const fileHandle = await dir.getFileHandle(this.key).catch(() => null);
+
+      if (fileHandle) {
         const file = await fileHandle.getFile();
         const text = await file.text();
         this.value = JSON.parse(text);
+        console.log(`[LocalStore] Loaded value from file:`, this.value);
       } else {
+        console.log(`[LocalStore] File not found, using initial value`);
         this.value = initialValue;
       }
-    } catch (_e) {
+    } catch (e) {
+      console.error(`[LocalStore] Failed to initialize:`, e);
       this.value = initialValue;
     }
   }

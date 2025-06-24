@@ -56,7 +56,9 @@
             duration: number;
         }>>("saved-recordings", []);
 
-        loadRecordings();
+        // Load and set recordings state
+        const loaded = loadRecordings();
+        recordings = loaded;
         console.log('Recordings store initialized:', recordingsStore);
     });
 
@@ -88,6 +90,9 @@
         }
 
         const raw = recordingsStore.get() || [];
+
+        console.log(`Loaded ${raw.length} recording(s) from store:`, raw);
+
         return raw.map((rec: any) => {
             if (rec.videoBlob && typeof rec.videoBlob === 'object' && rec.videoBlob.base64 && rec.videoBlob.type) {
                 return {
@@ -106,16 +111,11 @@
         videoBlob: Blob;
         sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
         duration: number;
-    }> = $state(loadRecordings());
+    }> = $state([]);
 
-    $effect(async () => {
-        recordings;
-
-        if (!recordingsStore) {
-            return;
-        }
-
-        // Store videoBlob as base64+type
+    // Save recordings to storage
+    async function saveRecordings() {
+        if (!recordingsStore) return;
         const toStore = await Promise.all(recordings.map(async (rec) => {
             if (rec.videoBlob instanceof Blob) {
                 const base64 = await blobToBase64(rec.videoBlob);
@@ -124,7 +124,7 @@
             return rec;
         }));
         await recordingsStore.set(toStore);
-    });
+    }
 
     let selectedRecording: any = $state(null);
 
@@ -226,12 +226,13 @@
         
         recordings = [...recordings, newRecording];
         recordingSensorData = [];
-        
+        saveRecordings();
         console.log('Recording saved:', newRecording);
     }
 
     function handleDeleteRecording(id: string) {
         recordings = recordings.filter(r => r.id !== id);
+        saveRecordings();
     }
 
     function handlePlayRecording(recording: any) {
