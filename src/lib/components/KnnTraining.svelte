@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { mdsClassic } from "$lib/mds";
     import DynamicTimeWarping from "dynamic-time-warping-ts";
     import { LocalStore } from "$lib/localStore";
     import type { Recording, LabeledRecording } from "./LabeledRecordings.ts";
+    import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -80,19 +80,6 @@
       return dtw.getDistance();
     }
 
-    // Compute distance matrix for all segments
-    function computeDistanceMatrix(segments: Array<LabeledRecording & { data: number[][] }>): number[][] {
-      const n = segments.length;
-      const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-      for (let i = 0; i < n; ++i) {
-        for (let j = i + 1; j < n; ++j) {
-          const d = dtwDistance(segments[i].data, segments[j].data);
-          dist[i][j] = dist[j][i] = d;
-        }
-      }
-      return dist;
-    }
-
     // Effect: load segments and compute MDS
     $effect(() => {
       if (!recordings || recordings.length === 0) {
@@ -109,8 +96,6 @@
           mdsPoints = [];
           return;
         }
-        const dist = computeDistanceMatrix(segs);
-        mdsPoints = mdsClassic(dist, 2);
       })();
     });
 
@@ -118,24 +103,6 @@
     const width = 400;
     const height = 320;
     const padding = 32;
-
-    // Derived: scale MDS points to fit SVG
-    const scaledPoints = $derived(() => {
-      if (!mdsPoints || mdsPoints.length === 0) return [];
-      const xs = mdsPoints.map(p => p[0]);
-      const ys = mdsPoints.map(p => p[1]);
-      const minX = Math.min(...xs), maxX = Math.max(...xs);
-      const minY = Math.min(...ys), maxY = Math.max(...ys);
-      return mdsPoints.map(([x, y]) => [
-        padding + ((x - minX) / (maxX - minX || 1)) * (width - 2 * padding),
-        height - (padding + ((y - minY) / (maxY - minY || 1)) * (height - 2 * padding))
-      ]);
-    });
-
-    // Helper to get array for #each
-    function getScaledPoints(): number[][] {
-      return Array.isArray(scaledPoints) ? scaledPoints : (typeof scaledPoints === 'function' ? scaledPoints() : []);
-    }
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center">
@@ -143,33 +110,16 @@
   <p class="text-gray-600 mb-4">Training k-NN is quick and efficient, but may not capture complex patterns.</p>
   <div class="flex flex-col items-center">
     <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
-    {#if labeledSegments.length < 2}
-      <div class="text-gray-400 text-sm py-8">Not enough labeled segments to plot.</div>
-    {:else}
-      <svg width={width} height={height} class="bg-gray-50 rounded border border-gray-200">
-        {#each getScaledPoints() as [x, y], i}
-          <circle
-            cx={x}
-            cy={y}
-            r="10"
-            fill={colors[labeledSegments[i].label]}
-            fill-opacity="0.7"
-            stroke="#222"
-            stroke-width="1.5"
-          />
-        {/each}
-        {#each getScaledPoints() as [x, y], i}
-          <text
-            x={x}
-            y={y - 14}
-            text-anchor="middle"
-            class="text-xs font-semibold"
-            fill="#222"
-          >
-            {labeledSegments[i].label}
-          </text>
-        {/each}
-      </svg>
+    <MdsPlot
+      points={labeledSegments.map(s => s.data)}
+      labels={labeledSegments.map(s => s.label)}
+      colors={colors}
+      distance={dtwDistance}
+      width={width}
+      height={height}
+      padding={padding}
+    />
+    {#if labeledSegments.length >= 2}
       <div class="flex flex-wrap gap-4 mt-4 justify-center">
         {#each Array.from(new Set(labels)) as label}
           <div class="flex items-center gap-2 text-sm">
