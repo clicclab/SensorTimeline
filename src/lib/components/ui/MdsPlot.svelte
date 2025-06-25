@@ -49,7 +49,7 @@
 	{#if !points || points.length < 2}
 		<div class="text-gray-400 text-sm py-8">Not enough points to plot.</div>
 	{:else}
-		<svg {width} {height} class="bg-gray-50 rounded border border-gray-200">
+		<svg {width} {height} class="bg-gray-50 rounded border border-gray-200" style="overflow: visible;">
 			{#if overlay}
 				{#each Array.from({length: Math.ceil(1/0.06)+1}, (_, ix) => ix * 0.06) as x}
 					{#each Array.from({length: Math.ceil(1/0.06)+1}, (_, iy) => iy * 0.06) as y}

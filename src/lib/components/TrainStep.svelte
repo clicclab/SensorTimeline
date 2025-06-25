@@ -63,7 +63,7 @@
 </div>
 
 {#if modelType === "neural"}
-    <NeuralNetworkTraining />
+    <NeuralNetworkTraining {recordings} />
 {:else if modelType === "knn"}
     <KnnTraining {recordings} />
 {:else}
