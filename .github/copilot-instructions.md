@@ -49,8 +49,10 @@
 
 ## Comments
 
-- Use comments to explain complex logic or important decisions.
-- Avoid commenting on obvious code; let the code speak for itself.
+- Focus on why something is done, especially for complex logic, rather than what is done. 
+- Only add high-value comments if necessary for clarity or if requested by the user. 
+- Do not edit comments that are seperate from the code you are changing.
+- NEVER talk to the user or describe your changes through comments.
 - DON'T COMMENT WHAT YOU HAVE CHANGED
 
 ---
