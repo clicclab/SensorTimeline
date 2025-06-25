@@ -3,6 +3,7 @@
     import { LocalStore } from "$lib/localStore";
     import type { Recording, LabeledRecording } from "./LabeledRecordings.ts";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
+    import { createKnnClassifierModel, classifyWithKnnModel, type KnnClassifierModel } from "$lib/knn";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -12,6 +13,8 @@
     let labeledSegments: Array<LabeledRecording & { data: number[][] }> = $state([]);
     let mdsPoints: number[][] = $state([]);
     let labels: string[] = $state([]);
+    let k = $state(3);
+    let maxDistance = $state(0.5);
     let colors: Record<string, string> = $derived(
       Array.from(new Set(labels)).reduce((acc, label, i) => {
         // Tailwind palette, fallback to gray
@@ -96,7 +99,63 @@
           mdsPoints = [];
           return;
         }
+
+        // Compute MDS points
+        if (segs.length >= 2) {
+          // Use the same distance function as the plot
+          const n = segs.length;
+          const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+          for (let i = 0; i < n; ++i) {
+            for (let j = i + 1; j < n; ++j) {
+              const d = dtwDistance(segs[i].data, segs[j].data);
+              dist[i][j] = dist[j][i] = d;
+            }
+          }
+          // Import mdsClassic from $lib/mds"
+          const { mdsClassic } = await import("$lib/mds");
+          mdsPoints = mdsClassic(dist, 2);
+        }
       })();
+    });
+
+    // Overlay function for MDS plot, using kNN classifier (in MDS coordinates)
+    let mdsOverlayFn: ((x: number, y: number) => string | undefined) = $state((x, y) => undefined);
+
+    $effect(() => {
+        k;
+        maxDistance;
+
+        if (!labeledSegments || labeledSegments.length < 2 || mdsPoints.length < 2) {
+            mdsOverlayFn = () => undefined;
+            return;
+        }
+
+        const xs = mdsPoints.map(p => p[0]);
+        const ys = mdsPoints.map(p => p[1]);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const model = createKnnClassifierModel(
+            labeledSegments.map(({ label, data }) => ({ label, data })),
+            k,
+            maxDistance
+        );
+        const model2d: KnnClassifierModel = {
+            ...model,
+            segments: mdsPoints.map((pt, i) => ({
+            label: labeledSegments[i].label,
+            data: [[
+                (pt[0] - minX) / (maxX - minX || 1),
+                (pt[1] - minY) / (maxY - minY || 1),
+                0
+            ]]
+            }))
+        };
+        const dist2d = (a: number[][], b: number[][]) => {
+            const [p] = a, [q] = b;
+            return Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2));
+        };
+        mdsOverlayFn = (x: number, y: number) => classifyWithKnnModel(model2d, [[x, y, 0]], dist2d);
+        console.log("KNN model created with k =", k, "and maxDistance =", maxDistance);
     });
 
     // SVG plot settings
@@ -108,6 +167,34 @@
 <div class="bg-white rounded-xl p-8 text-center">
   <h2 class="text-2xl font-bold mb-4">k-Nearest Neighbors Training</h2>
   <p class="text-gray-600 mb-4">Training k-NN is quick and efficient, but may not capture complex patterns.</p>
+  <div class="flex flex-col sm:flex-row gap-4 mb-6 justify-center items-center">
+    <label class="flex flex-col items-center gap-2 w-48">
+      <span class="font-medium">k</span>
+      <input
+        type="range"
+        min="1"
+        max={Math.max(1, labeledSegments.length)}
+        step="1"
+        bind:value={k}
+        class="w-full accent-blue-600"
+        aria-label="Number of neighbors (k)"
+      />
+      <span class="text-xs text-gray-500">{k}</span>
+    </label>
+    <label class="flex flex-col items-center gap-2 w-64">
+      <span class="font-medium">Max Distance</span>
+      <input
+        type="range"
+        min="0.1"
+        max="1"
+        step="0.1"
+        bind:value={maxDistance}
+        class="w-full accent-blue-600"
+        aria-label="Maximum distance threshold"
+      />
+      <span class="text-xs text-gray-500">{maxDistance}</span>
+    </label>
+  </div>
   <div class="flex flex-col items-center">
     <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
     <MdsPlot
@@ -118,6 +205,7 @@
       width={width}
       height={height}
       padding={padding}
+      overlay={mdsOverlayFn}
     />
     {#if labeledSegments.length >= 2}
       <div class="flex flex-wrap gap-4 mt-4 justify-center">

@@ -7,8 +7,9 @@
 		width?: number;
 		height?: number;
 		padding?: number;
+		overlay?: ((x: number, y: number) => string | undefined);
 	};
-	let { points, labels = [], colors = {}, distance, width = 400, height = 320, padding = 32 }: Props = $props();
+	let { points, labels = [], colors = {}, distance, width = 400, height = 320, padding = 32, overlay }: Props = $props();
 
 	import { mdsClassic } from "$lib/mds";
 
@@ -49,6 +50,25 @@
 		<div class="text-gray-400 text-sm py-8">Not enough points to plot.</div>
 	{:else}
 		<svg {width} {height} class="bg-gray-50 rounded border border-gray-200">
+			{#if overlay}
+				{#each Array.from({length: Math.ceil(1/0.06)+1}, (_, ix) => ix * 0.06) as x}
+					{#each Array.from({length: Math.ceil(1/0.06)+1}, (_, iy) => iy * 0.06) as y}
+						{#if !isNaN(x) && !isNaN(y)}
+							{@const label = overlay(x, y)}
+							{label}
+							<rect
+								x={padding + x * (width - 2 * padding) - 6}
+								y={height - (padding + y * (height - 2 * padding)) - 6}
+								width="12"
+								height="12"
+								fill={label ? (colors[label] || '#888') : '#888'}
+								fill-opacity={label ? '0.12' : '0.06'}
+								stroke="none"
+							/>
+						{/if}
+					{/each}
+				{/each}
+			{/if}
 			{#each getScaledPoints() as [x, y], i}
 				<circle
 					cx={x}
