@@ -1,6 +1,4 @@
 <script lang="ts">
-    import { LocalStore } from "$lib/localStore";
-    import Sparkline from "$lib/components/ui/Sparkline.svelte";
     import LabeledRecordingsList from "$lib/components/LabeledRecordingsList.svelte";
 
     type Props = {

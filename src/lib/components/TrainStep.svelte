@@ -1,17 +1,69 @@
 <script lang="ts">
-type TrainStepProps = {
-    stepBack: () => void;
-    stepForward: () => void;
-};
+    import { LocalStore } from "$lib/localStore";
+    import type { Recording } from "./LabeledRecordings.ts";
+    import LabeledRecordingsList from "./LabeledRecordingsList.svelte";
+    import ModelTypeSelector from "./ModelTypeSelector.svelte";
 
-let { stepBack, stepForward }: TrainStepProps = $props();
+    type TrainStepProps = {
+        stepBack: () => void;
+        stepForward: () => void;
+    };
+
+    let { stepBack, stepForward }: TrainStepProps = $props();
+
+    let recordingsStore: LocalStore<any> | null = $state.raw(null);
+    let recordings: Array<Recording> = $state([]);
+
+    // On mount: initialize recordings store and load
+    if (typeof window !== "undefined") {
+        LocalStore.create<Array<Recording>>("saved-recordings", []).then(
+            (store) => {
+                recordingsStore = store;
+                recordings = loadRecordings();
+            },
+        );
+    }
+
+    function loadRecordings(): Array<Recording> {
+        if (!recordingsStore) return [];
+        const raw = recordingsStore.get() || [];
+        return raw.map((rec: any) => {
+            if (
+                rec.videoBlob &&
+                typeof rec.videoBlob === "object" &&
+                rec.videoBlob.base64 &&
+                rec.videoBlob.type
+            ) {
+                return {
+                    ...rec,
+                };
+            }
+            return rec;
+        });
+    }
+
+    // Add ModelType type for clarity
+    export type ModelType = "neural" | "knn";
+    let modelType: ModelType = $state("neural");
+
+    function handleModelTypeChange(val: ModelType) {
+        modelType = val;
+    }
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center">
     <h2 class="text-2xl font-bold mb-4">Train Model</h2>
-    <p class="text-gray-600 mb-4">This step will allow you to train a model using your collected recordings. (Coming soon!)</p>
-    <!-- Placeholder for model training UI -->
 </div>
+
+<div class="my-8">
+    <h3 class="text-lg font-semibold mb-2 text-left">Your Collected Recordings</h3>
+    <LabeledRecordingsList {recordings} />
+</div>
+
+<div class="my-8">
+    <ModelTypeSelector {modelType} onChange={handleModelTypeChange} />
+</div>
+
 <div class="flex justify-between mt-8">
     <button
         onclick={stepBack}
