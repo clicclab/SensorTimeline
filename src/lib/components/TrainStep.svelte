@@ -3,6 +3,8 @@
     import type { Recording } from "./LabeledRecordings.ts";
     import LabeledRecordingsList from "./LabeledRecordingsList.svelte";
     import ModelTypeSelector from "./ModelTypeSelector.svelte";
+    import NeuralNetworkTraining from "./NeuralNetworkTraining.svelte";
+    import KnnTraining from "./KnnTraining.svelte";
 
     type TrainStepProps = {
         stepBack: () => void;
@@ -61,17 +63,9 @@
 </div>
 
 {#if modelType === "neural"}
-    <div class="bg-white rounded-xl p-8 text-center">
-        <h2 class="text-2xl font-bold mb-4">Neural Network Training</h2>
-        <p class="text-gray-600 mb-4">Training a neural network can take some time, please be patient.</p>
-        <!-- Placeholder for neural network training UI -->
-    </div>
+    <NeuralNetworkTraining />
 {:else if modelType === "knn"}
-    <div class="bg-white rounded-xl p-8 text-center">
-        <h2 class="text-2xl font-bold mb-4">k-Nearest Neighbors Training</h2>
-        <p class="text-gray-600 mb-4">Training k-NN is quick and efficient, but may not capture complex patterns.</p>
-        <!-- Placeholder for k-NN training UI -->
-    </div>
+    <KnnTraining />
 {:else}
     <div class="bg-white rounded-xl p-8 text-center">
         <h2 class="text-2xl font-bold mb-4">Select a Model Type</h2>
