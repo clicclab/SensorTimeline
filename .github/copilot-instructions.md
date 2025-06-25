@@ -63,7 +63,7 @@
 		label: string;
 		onClick?: () => void;
 	};
-	let { label, onClick } = $props();
+	let { label, onClick }: Props = $props();
 	let count = $state(0);
 	let doubled = $derived(count * 2);
 	let complexValue = $derived.by(() => {
