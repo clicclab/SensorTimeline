@@ -4,6 +4,7 @@
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { LocalStore } from "$lib/localStore.js";
     import DynamicTimeWarping from "dynamic-time-warping-ts";
+    import { modelStore } from "$lib/modelStore";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -85,12 +86,13 @@
 
     async function handleTrain() {
         isTraining = true;
-        await Promise.resolve(); // allow DOM to update before heavy work
+        await Promise.resolve();
         trainLoss = [];
         // Prepare segments
         const segments = labeledSegments.map(({ label, data }) => ({ label, data }));
         const result = await trainNNClassifier(segments, { epochs, learningRate, hiddenUnits });
         nnModel = result.model;
+        modelStore.set(nnModel); // Save model to store for use in test step
         trainLoss = result.loss;
         const segs = await loadLabeledSegments();
         labeledSegments = segs;

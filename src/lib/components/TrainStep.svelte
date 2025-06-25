@@ -5,6 +5,9 @@
     import ModelTypeSelector from "./ModelTypeSelector.svelte";
     import NeuralNetworkTraining from "./NeuralNetworkTraining.svelte";
     import KnnTraining from "./KnnTraining.svelte";
+    import { modelStore } from "$lib/modelStore";
+    import type { NNClassifierModel } from "$lib/nn.js";
+    import type { KnnClassifierModel } from "$lib/knn.js";
 
     type TrainStepProps = {
         stepBack: () => void;
@@ -47,6 +50,13 @@
     // Add ModelType type for clarity
     export type ModelType = "neural" | "knn";
     let modelType: ModelType | null = $state(null);
+
+    let model: NNClassifierModel | KnnClassifierModel | null = $state(null);
+
+    modelStore.subscribe((m) => {
+        model = m;
+    });
+
 </script>
 
 <div class="bg-white rounded-xl p-2 text-center">
@@ -83,8 +93,9 @@
     </button>
     <button
         onclick={stepForward}
-        class="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+        class="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors disabled:opacity-50"
         aria-label="Next: Test Model"
+        disabled={!model}
     >
         Next: Test Model &rarr;
     </button>

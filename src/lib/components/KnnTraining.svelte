@@ -4,6 +4,7 @@
     import type { Recording, LabeledRecording } from "./LabeledRecordings.ts";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { createKnnClassifierModel, classifyWithKnnModel, type KnnClassifierModel } from "$lib/knn";
+    import { modelStore } from "$lib/modelStore.js";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -139,6 +140,7 @@
             k,
             maxDistance
         );
+        modelStore.set(model); // Save model to store for use in test step
         const model2d: KnnClassifierModel = {
             ...model,
             segments: mdsPoints.map((pt, i) => ({
