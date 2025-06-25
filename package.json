@@ -18,10 +18,13 @@
 		"@types/plotly.js": "^3.0.0",
 		"@types/qrcode": "^1.5.5",
 		"@types/web-bluetooth": "^0.0.21",
+		"d3": "^7.9.0",
+		"dynamic-time-warping-ts": "^1.0.0",
 		"peerjs": "^1.5.4",
 		"plotly.js-dist": "^3.0.1",
 		"qr-scanner": "^1.4.2",
-		"qrcode": "^1.5.4"
+		"qrcode": "^1.5.4",
+		"svd-js": "^1.1.1"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",

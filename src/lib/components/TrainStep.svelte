@@ -65,7 +65,7 @@
 {#if modelType === "neural"}
     <NeuralNetworkTraining />
 {:else if modelType === "knn"}
-    <KnnTraining />
+    <KnnTraining {recordings} />
 {:else}
     <div class="bg-white rounded-xl p-8 text-center">
         <h2 class="text-2xl font-bold mb-4">Select a Model Type</h2>
