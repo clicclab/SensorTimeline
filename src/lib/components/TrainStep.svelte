@@ -44,25 +44,40 @@
 
     // Add ModelType type for clarity
     export type ModelType = "neural" | "knn";
-    let modelType: ModelType = $state("neural");
-
-    function handleModelTypeChange(val: ModelType) {
-        modelType = val;
-    }
+    let modelType: ModelType | null = $state(null);
 </script>
 
-<div class="bg-white rounded-xl p-8 text-center">
-    <h2 class="text-2xl font-bold mb-4">Train Model</h2>
+<div class="bg-white rounded-xl p-2 text-center">
+    <h2 class="text-2xl font-bold">Train Model</h2>
 </div>
 
-<div class="my-8">
+<div class="my-4">
     <h3 class="text-lg font-semibold mb-2 text-left">Your Collected Recordings</h3>
     <LabeledRecordingsList {recordings} />
 </div>
 
 <div class="my-8">
-    <ModelTypeSelector {modelType} onChange={handleModelTypeChange} />
+    <ModelTypeSelector onChange={(val) => modelType = val} />
 </div>
+
+{#if modelType === "neural"}
+    <div class="bg-white rounded-xl p-8 text-center">
+        <h2 class="text-2xl font-bold mb-4">Neural Network Training</h2>
+        <p class="text-gray-600 mb-4">Training a neural network can take some time, please be patient.</p>
+        <!-- Placeholder for neural network training UI -->
+    </div>
+{:else if modelType === "knn"}
+    <div class="bg-white rounded-xl p-8 text-center">
+        <h2 class="text-2xl font-bold mb-4">k-Nearest Neighbors Training</h2>
+        <p class="text-gray-600 mb-4">Training k-NN is quick and efficient, but may not capture complex patterns.</p>
+        <!-- Placeholder for k-NN training UI -->
+    </div>
+{:else}
+    <div class="bg-white rounded-xl p-8 text-center">
+        <h2 class="text-2xl font-bold mb-4">Select a Model Type</h2>
+        <p class="text-gray-600 mb-4">Please select a model type to proceed with training.</p>
+    </div>
+{/if}
 
 <div class="flex justify-between mt-8">
     <button

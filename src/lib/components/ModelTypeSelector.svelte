@@ -2,10 +2,16 @@
 import type { ModelType } from "$lib/types";
 
 type Props = {
-    modelType: ModelType;
-    onChange: (val: ModelType) => void;
+    onChange: (val: ModelType | null) => void;
 };
-let { modelType, onChange }: Props = $props();
+let { onChange }: Props = $props();
+let modelType: ModelType | null = $state(null);
+
+$effect(() => {
+    modelType;
+    onChange(modelType);
+});
+
 </script>
 
 <div class="mb-8 p-6 bg-gray-50 rounded-xl">
@@ -15,8 +21,9 @@ let { modelType, onChange }: Props = $props();
             <input
                 type="radio"
                 checked={modelType === 'neural'}
-                onchange={() => onChange('neural')}
+                onchange={() => modelType = 'neural'}
                 class="peer sr-only"
+                name="modelType"
             />
             <div class="h-full flex flex-col justify-between p-4 border-2 border-gray-200 rounded-lg cursor-pointer peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-gray-300 transition-all">
                 <div class="flex items-center space-x-3">
@@ -34,8 +41,9 @@ let { modelType, onChange }: Props = $props();
             <input
                 type="radio"
                 checked={modelType === 'knn'}
-                onchange={() => onChange('knn')}
+                onchange={() => modelType = 'knn'}
                 class="peer sr-only"
+                name="modelType"
             />
             <div class="h-full flex flex-col justify-between p-4 border-2 border-gray-200 rounded-lg cursor-pointer peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-all">
                 <div class="flex items-center space-x-3">
