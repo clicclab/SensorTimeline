@@ -51,11 +51,17 @@ function vectorMul(a: number[], b: number[]): number[] {
 }
 
 export function mdsClassic(distances: number[][], dimensions: number = 2): MDSResult {
+    if (!distances || distances.length === 0) return [];
+    if (distances.length === 1) {
+        // Return a single point at the origin, padded to the requested dimensions
+        return [Array(dimensions).fill(0)];
+    }
     // square distances
     let M = matrixMul(matrixPow(distances, 2), -0.5);
 
     // double centre the rows/columns
     function mean(A: number[][]): number[] {
+        if (!A || A.length === 0) return [];
         const n = A.length;
         const m = A[0].length;
         const sum = Array(m).fill(0);
@@ -78,14 +84,15 @@ export function mdsClassic(distances: number[][], dimensions: number = 2): MDSRe
 
     // take the SVD of the double centred matrix, and return the points from it
     const ret = SVD(M);
-    console.log('SVD result:', ret);
-    
     // Take top dimensions from the SVD result
     const points: number[][] = [];
     for (let i = 0; i < ret.u.length; ++i) {
         const point: number[] = [];
         for (let j = 0; j < dimensions; ++j) {
-            point.push(ret.u[i][j] * Math.sqrt(ret.q[j]));
+            // Defensive: if ret.u[i][j] or ret.q[j] is undefined, fill with 0
+            const uij = ret.u[i][j] ?? 0;
+            const qj = ret.q[j] ?? 0;
+            point.push(uij * Math.sqrt(Math.max(qj, 0)));
         }
         points.push(point);
     }

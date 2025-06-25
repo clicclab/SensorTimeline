@@ -70,10 +70,13 @@
 
     // Compute DTW distance between two segments
     function dtwDistance(a: number[][], b: number[][]): number {
-      // Use only magnitude for simplicity
-      const seqA = a.map(v => Math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2));
-      const seqB = b.map(v => Math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2));
-      const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.abs(x - y));
+      const seqA = a.map(v => [v[0], v[1], v[2]]);
+      const seqB = b.map(v => [v[0], v[1], v[2]]);
+      const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
+        Math.pow(x[0] - y[0], 2) +
+        Math.pow(x[1] - y[1], 2) +
+        Math.pow(x[2] - y[2], 2)
+      ));
       return dtw.getDistance();
     }
 
