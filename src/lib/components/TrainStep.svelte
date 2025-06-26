@@ -5,9 +5,10 @@
     import ModelTypeSelector from "./ModelTypeSelector.svelte";
     import NeuralNetworkTraining from "./NeuralNetworkTraining.svelte";
     import KnnTraining from "./KnnTraining.svelte";
-    import { modelStore } from "$lib/modelStore";
+    import { initModelStore, modelStore } from "$lib/modelStore";
     import type { NNClassifierModel } from "$lib/nn.js";
     import type { KnnClassifierModel } from "$lib/knn.js";
+    import { onMount } from "svelte";
 
     type TrainStepProps = {
         stepBack: () => void;
@@ -51,7 +52,15 @@
     export type ModelType = "neural" | "knn";
     let modelType: ModelType | null = $state(null);
 
-    let hasModel = modelStore.get() !== null;
+    let hasModel = $state(false);
+
+    onMount(async () => {
+        // Initialize model store
+        await initModelStore();
+        
+        const model = modelStore.get();
+        hasModel = model !== null;
+    });
 
     modelStore.subscribe(value => {
         hasModel = value !== null;

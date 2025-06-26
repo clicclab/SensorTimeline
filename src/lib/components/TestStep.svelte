@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { modelStore } from "$lib/modelStore";
+    import { initModelStore, modelStore } from "$lib/modelStore";
     import { nnPredict, type NNClassifierModel } from "$lib/nn";
     import { classifyWithKnnModel, type KnnClassifierModel } from "$lib/knn";
     import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
@@ -13,7 +13,7 @@
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import { browser } from "$app/environment";
     import DynamicTimeWarping from "dynamic-time-warping-ts";
-    import { onDestroy } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { flattenSegment } from "$lib/nn";
     import { data } from "@tensorflow/tfjs";
@@ -24,7 +24,15 @@
     };
     let { stepBack }: TestStepProps = $props();
 
-    let model = modelStore.get();
+    let model: NNClassifierModel | KnnClassifierModel | null = $state(null);
+
+    onMount(async () => {
+        await initModelStore();
+        model = modelStore.get();
+        modelStore.subscribe(value => {
+            model = value;
+        });
+    });
 
     let inputSource: 'webrtc' | 'microbit' = $state('microbit');
 
