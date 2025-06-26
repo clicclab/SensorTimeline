@@ -9,7 +9,7 @@ Deno.test("returns correct 2D coordinates for a simple distance matrix", () => {
         [1, 0, 1],
         [2, 1, 0]
     ];
-    const result = mdsClassic(distances, 2);
+    const { points: result } = mdsClassic(distances, 2);
     expect(result.length).toBe(3);
     // The points should be colinear and equally spaced
     // Allow for sign/rotation ambiguity
@@ -25,7 +25,7 @@ Deno.test("returns correct shape for 3D output", () => {
         [1, 0, 1],
         [2, 1, 0]
     ];
-    const result = mdsClassic(distances, 3);
+    const { points: result } = mdsClassic(distances, 3);
     expect(result.length).toBe(3);
     expect(result[0].length).toBe(3);
 });
@@ -35,19 +35,19 @@ Deno.test("handles identical points (zero distances)", () => {
         [0, 0],
         [0, 0]
     ];
-    const result = mdsClassic(distances, 2);
+    const { points: result } = mdsClassic(distances, 2);
     expect(result.length).toBe(2);
     expect(result[0][0]).toBeCloseTo(result[1][0]);
     expect(result[0][1]).toBeCloseTo(result[1][1]);
 });
 
 Deno.test("returns empty for empty input", () => {
-    const result = mdsClassic([], 2);
+    const { points: result } = mdsClassic([], 2);
     expect(result).toEqual([]);
 });
 
 Deno.test("returns correct result for 1x1 input", () => {
-    const result = mdsClassic([[0]], 2);
+    const { points: result } = mdsClassic([[0]], 2);
     expect(result.length).toBe(1);
     expect(result[0].length).toBe(2);
     expect(result[0][0]).not.toBeNaN();
@@ -61,7 +61,7 @@ Deno.test("returns correct result for symmetric 2x2 input", () => {
         [0, 3],
         [3, 0]
     ];
-    const result = mdsClassic(distances, 2);
+    const { points: result } = mdsClassic(distances, 2);
     expect(result.length).toBe(2);
     const d = Math.hypot(result[0][0] - result[1][0], result[0][1] - result[1][1]);
     expect(Math.abs(d - 3)).toBeLessThan(1e-6);
@@ -75,7 +75,7 @@ Deno.test("returns correct result for 4 points in a square", () => {
         [Math.sqrt(2), 1, 0, 1],
         [1, Math.sqrt(2), 1, 0]
     ];
-    const result = mdsClassic(distances, 2);
+    const { points: result } = mdsClassic(distances, 2);
     console.log('Square test result:', JSON.stringify(result));
     expect(result.length).toBe(4);
     // Instead of checking all pairwise distances, check that the set of sorted distances matches expected values within tolerance

@@ -5,6 +5,31 @@ export type KnnResult = {
   distance: number;
 };
 
+export function euclideanDistance(a: number[][], b: number[][]): number {
+  if (a.length !== b.length) {
+    throw new Error("Segments must have the same length for Euclidean distance");
+  }
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].length !== b[i].length) {
+      throw new Error("Segments must have the same number of dimensions for Euclidean distance");
+    }
+    for (let j = 0; j < a[i].length; j++) {
+      sum += Math.pow(a[i][j] - b[i][j], 2);
+    }
+  }
+  return Math.sqrt(sum);
+}
+
+export function knnModelClassify(
+  model: KnnClassifierModel,
+  query: number[][],
+  distanceFn: (a: number[][], b: number[][]) => number
+): string | undefined {
+  // Use knnClassify with the model's segments
+  return knnClassify(query, model.segments, model.k, model.maxDistance, distanceFn);
+}
+
 export function knnClassify(
   query: number[][],
   labeledSegments: Array<LabeledRecording & { data: number[][] }>,

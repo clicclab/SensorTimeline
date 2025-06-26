@@ -1,10 +1,10 @@
 <script lang="ts">
-    import DynamicTimeWarping from "dynamic-time-warping-ts";
     import { LocalStore } from "$lib/localStore";
     import type { Recording, LabeledRecording } from "./LabeledRecordings.ts";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { createKnnClassifierModel, classifyWithKnnModel, type KnnClassifierModel } from "$lib/knn";
     import { modelStore } from "$lib/modelStore.js";
+    import DynamicTimeWarping from "dynamic-time-warping-ts";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -72,17 +72,20 @@
       return all;
     }
 
+
     // Compute DTW distance between two segments
-    function dtwDistance(a: number[][], b: number[][]): number {
-      const seqA = a.map(v => [v[0], v[1], v[2]]);
-      const seqB = b.map(v => [v[0], v[1], v[2]]);
-      const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
+    export function dtwDistance(a: number[][], b: number[][]): number {
+    const seqA = a.map(v => [v[0], v[1], v[2]]);
+    const seqB = b.map(v => [v[0], v[1], v[2]]);
+    const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
         Math.pow(x[0] - y[0], 2) +
         Math.pow(x[1] - y[1], 2) +
         Math.pow(x[2] - y[2], 2)
-      ));
-      return dtw.getDistance();
+    ));
+    return dtw.getDistance();
     }
+
+
 
     // Effect: load segments and compute MDS
     $effect(() => {
@@ -114,7 +117,7 @@
           }
           // Import mdsClassic from $lib/mds"
           const { mdsClassic } = await import("$lib/mds");
-          mdsPoints = mdsClassic(dist, 2);
+          ({ points: mdsPoints } = mdsClassic(dist, 2));
         }
       })();
     });

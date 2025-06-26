@@ -113,7 +113,7 @@
                 }
             }
             const { mdsClassic } = await import("$lib/mds");
-            mdsPoints = mdsClassic(dist, 2);
+            ({ points: mdsPoints } = mdsClassic(dist, 2));
         }
         // Compute predicted labels for each training point
         if (nnModel && labeledSegments.length > 0) {

@@ -5,7 +5,7 @@ import { browser } from "$app/environment";
  * Throws if StorageManager is not available.
  */
 export class LocalStore<T> {
-  private constructor(public key: string, public value: T) {}
+  private constructor(public key: string, public value: T, private subscribers: Set<(value: T) => void> = new Set()) {}
 
   static async get<T>(key: string, defaultValue: T | null = null): Promise<T | null> {
     if (key.length === 0) throw new Error("Key cannot be an empty string");
@@ -78,6 +78,14 @@ export class LocalStore<T> {
     }
   }
 
+  subscribe(callback: (value: T) => void): () => void {
+    this.subscribers.add(callback);
+
+    return () => {
+      this.subscribers.delete(callback);
+    };
+  }
+
   /**
    * Sets the value and updates storage.
    * @param newValue The new value to be set.
@@ -90,6 +98,8 @@ export class LocalStore<T> {
       const writable = await handle.createWritable();
       await writable.write(JSON.stringify(newValue));
       await writable.close();
+      console.log(`[LocalStore] Value set and saved to file:`, newValue);
+      this.subscribers.forEach(callback => callback(this.value));
     }
   }
 

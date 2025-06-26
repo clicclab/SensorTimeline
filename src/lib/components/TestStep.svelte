@@ -1,8 +1,8 @@
 <script lang="ts">
     import { modelStore } from "$lib/modelStore";
     import { get } from "svelte/store";
-    import { type NNClassifierModel } from "$lib/nn";
-    import { type KnnClassifierModel } from "$lib/knn";
+    import { nnPredict, type NNClassifierModel } from "$lib/nn";
+    import { knnClassify, knnModelClassify, type KnnClassifierModel } from "$lib/knn";
     import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
     import WebcamRecorder from "$lib/components/WebcamRecorder.svelte";
     import Peer from "peerjs";
@@ -13,6 +13,13 @@
     import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import { browser } from "$app/environment";
+    import DynamicTimeWarping from "dynamic-time-warping-ts";
+    import { on } from "svelte/events";
+    import { onDestroy } from "svelte";
+    import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
+    import { mdsClassic } from "$lib/mds";
+    import type { LabeledRecording } from "$lib/components/LabeledRecordings.ts";
+    import { flattenSegment } from "$lib/nn";
 
 
     type TestStepProps = {
@@ -20,7 +27,7 @@
     };
     let { stepBack }: TestStepProps = $props();
 
-    let model = get(modelStore);
+    let model = modelStore.get();
 
     let inputSource: 'webrtc' | 'microbit' = $state('microbit');
 
@@ -40,8 +47,11 @@
     let isMicroBitConnected: boolean = $state(false);
     let useMockMicroBit = $state(false);
 
+    // Prediction state
+    let predictedLabel: string | null = $state(null);
+
     // Allow recording if input is available (for demo, always true in test step)
-    let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected));
+    let allowRecording = $derived(inputSource === 'webrtc' ? !!connection : inputSource === 'microbit' ? isMicroBitConnected : false);
 
     $inspect(model);
 
@@ -99,6 +109,18 @@
         }
     }
 
+    // Compute DTW distance between two segments
+    export function dtwDistance(a: number[][], b: number[][]): number {
+        const seqA = a.map(v => [v[0], v[1], v[2]]);
+        const seqB = b.map(v => [v[0], v[1], v[2]]);
+        const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
+            Math.pow(x[0] - y[0], 2) +
+            Math.pow(x[1] - y[1], 2) +
+            Math.pow(x[2] - y[2], 2)
+        ));
+        return dtw.getDistance();
+    }
+
     $effect(() => {
         if (browser && inputSource === 'webrtc' && !peer) {
             const newPeer = new Peer();
@@ -140,25 +162,131 @@
     $effect(() => {
         clearDataHistory();
     });
+          
+    let predictInterval: NodeJS.Timeout | null = null;
 
+    if(browser) {
+        predictInterval = setInterval(() => {
+            if (accelerometerData) {
+                // Update the predicted label every second
+                predictLabel();
+            }
+        }, 1000);
+    }
+
+    let mdsUpdateInterval: NodeJS.Timeout | null = null;
+
+    if (browser) {
+        mdsUpdateInterval = setInterval(() => {
+            if (isKnnModel(model) && dataHistory.length >= 50) {
+                const segments = model.segments;
+                const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
+                mdsLabels = [...segments.map(s => s.label), 'Current Data'];
+                mdsPoints = [...segments.map(s => s.data), data];
+            } else if (isKnnModel(model)) {
+                const segments = model.segments;
+                mdsLabels = segments.map(s => s.label);
+                mdsPoints = segments.map(s => s.data);
+            } else {
+                mdsLabels = [];
+                mdsPoints = [];
+            }
+        }, 100);
+    }
+
+    onDestroy(() => {
+        if (predictInterval) {
+            clearInterval(predictInterval);
+        }
+        if (mdsUpdateInterval) {
+            clearInterval(mdsUpdateInterval);
+        }
+    });
+
+    function isKnnModel(model: any): boolean {
+      return model && Array.isArray(model.segments);
+    }
+    function isNNModel(model: any): boolean {
+      return model && Array.isArray(model.outputLabels);
+    }
+
+    function predictLabel() {
+        if (!model || !accelerometerData) {
+            predictedLabel = null;
+            return;
+        }
+        if (dataHistory.length < 50) {
+            predictedLabel = null;
+            return;
+        }
+        const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
+        if (isNNModel(model)) {
+            const flat = flattenSegment(data, 50 * 1); // 50 timesteps, 3 features
+            const result = nnPredict(model, flat);
+            predictedLabel = typeof result === 'string' ? result : null;
+        } else if (isKnnModel(model)) {
+            const result = knnModelClassify(model, data, dtwDistance);
+            predictedLabel = typeof result === 'string' ? result : null;
+        } else {
+            predictedLabel = null;
+        }
+    }
+
+    $inspect(predictedLabel);
+
+    // MDS plot state for k-NN model
+    let mdsPoints: number[][][] = $state([]);
+    let mdsLabels: string[] = $state([]);
+    let mdsColors: Record<string, string> = $derived(
+      Array.from(new Set(mdsLabels)).reduce((acc, label, i) => {
+        const palette = [
+          "#2563eb", "#16a34a", "#dc2626", "#f59e42", "#a21caf", "#eab308", "#0ea5e9", "#7c3aed", "#f43f5e", "#64748b"
+        ];
+        acc[label] = palette[i % palette.length] || "#888";
+        return acc;
+      }, {} as Record<string, string>)
+    );
+    let projectedPoint: number[] | null = $state(null);
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center mb-6">
-    <h2 class="text-2xl font-bold mb-4">Test Model</h2>
-    {#if model}
-        <div class="mb-4">
-            <h3 class="text-lg font-semibold mb-2">Model Info</h3>
-            {#if model.weights}
-                <p class="text-gray-600 mb-2">Neural Network Model</p>
-            {:else if model.segments}
-                <p class="text-gray-600 mb-2">k-NN Model</p>
-            {:else}
-                <p class="text-gray-600 mb-2">Unknown Model Type</p>                
-            {/if}
+  <h2 class="text-2xl font-bold mb-4">Test Model</h2>
+  {#if model}
+    <div class="mb-4">
+      <h3 class="text-lg font-semibold mb-2">Model Info</h3>
+      {#if isNNModel(model)}
+        <p class="text-gray-600 mb-2">Neural Network Model</p>
+      {:else if isKnnModel(model)}
+        <p class="text-gray-600 mb-2">k-NN Model</p>
+      {:else}
+        <p class="text-gray-600 mb-2">Unknown Model Type</p>
+      {/if}
+    </div>
+    {#if isKnnModel(model) && mdsPoints.length >= 2}
+      <div class="mb-6 relative">
+        <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
+        <MdsPlot
+          points={mdsPoints}
+          labels={mdsLabels}
+          colors={mdsColors}
+          distance={dtwDistance}
+          width={400}
+          height={320}
+          padding={32}
+        />
+        <div class="flex flex-wrap gap-4 mt-4 justify-center">
+          {#each Array.from(new Set(mdsLabels)) as label}
+            <div class="flex items-center gap-2 text-sm">
+              <span class="inline-block w-4 h-4 rounded-full" style={`background:${mdsColors[label]}`}></span>
+              <span>{label}</span>
+            </div>
+          {/each}
         </div>
-    {:else}
-        <p class="text-gray-600 mb-4">No trained model found. Please train a model first.</p>
+      </div>
     {/if}
+  {:else}
+    <p class="text-gray-600 mb-4">No trained model found. Please train a model first.</p>
+  {/if}
 </div>
 
 <InputSourceSelector
@@ -191,9 +319,22 @@
         useMock={useMockMicroBit}
     />
 {/if}
-<WebcamRecorder 
-    {allowRecording}
-/>
+<div class=" mt-4">
+    <WebcamRecorder 
+        allowRecording={false}
+    />
+</div>
+
+{#if accelerometerData}
+    <div class="bg-white rounded-lg p-4 shadow-sm mb-4 mt-4">
+        <div class="flex items-center justify-between">
+            <h3 class="font-medium text-gray-900">Live Prediction</h3>
+            <span class="text-lg font-mono px-3 py-1 rounded bg-blue-100 text-blue-700" aria-live="polite">
+                {predictedLabel ?? '—'}
+            </span>
+        </div>
+    </div>
+{/if}
 {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
     <div class="bg-gray-50 rounded-xl p-6 mt-6">
         <div class="flex items-center justify-between mb-4">
@@ -208,7 +349,7 @@
                 </span>
             </div>
         </div>
-        {#if accelerometerData}
+        {#if accelerometerData} 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div class="bg-white rounded-lg p-4 shadow-sm">
                     <div class="text-sm font-medium text-gray-500 mb-1">X-Axis</div>
@@ -232,7 +373,7 @@
                     <div class="text-xs text-gray-400">m/s²</div>
                 </div>
             </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm">
+            <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="font-medium text-gray-900">Data Stream</h3>
                     <button 

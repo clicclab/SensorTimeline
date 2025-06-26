@@ -185,35 +185,37 @@
     </div>
 
     <!-- Recording Controls -->
-    <div class="flex space-x-2">
-        {#if !isRecording}
-            <button 
-                onclick={startRecording}
-                disabled={!hasPermission || !allowRecording}
-                class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
-            >
-                <span>🔴</span>
-                <span>Start Recording</span>
-            </button>
-        {:else}
-            <button 
-                onclick={stopRecording}
-                class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
-            >
-                <span>⏹️</span>
-                <span>Stop Recording</span>
-            </button>
-        {/if}
-        
-        {#if !hasPermission && permissionError}
-            <button 
-                onclick={requestWebcamAccess}
-                class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm transition-colors"
-            >
-                Retry
-            </button>
-        {/if}
-    </div>
+    {#if allowRecording}
+        <div class="flex space-x-2">
+            {#if !isRecording}
+                <button 
+                    onclick={startRecording}
+                    disabled={!hasPermission || !allowRecording}
+                    class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                >
+                    <span>🔴</span>
+                    <span>Start Recording</span>
+                </button>
+            {:else}
+                <button 
+                    onclick={stopRecording}
+                    class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                >
+                    <span>⏹️</span>
+                    <span>Stop Recording</span>
+                </button>
+            {/if}
+            
+            {#if !hasPermission && permissionError}
+                <button 
+                    onclick={requestWebcamAccess}
+                    class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm transition-colors"
+                >
+                    Retry
+                </button>
+            {/if}
+        </div>
+    {/if}
 
     <!-- Recording Status -->
     {#if isRecording}

@@ -23,7 +23,7 @@
 				dist[i][j] = dist[j][i] = d;
 			}
 		}
-		return mdsClassic(dist, 2);
+		return mdsClassic(dist, 2).points;
 	});
 
 	const scaledPoints = $derived((): number[][] => {
