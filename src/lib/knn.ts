@@ -95,14 +95,12 @@ export function classifyWithKnnModel(
       distance: distanceFn(query, seg.data)
     }));
 
-  console.log("Neighbors before filtering:", neighbors);
 
   neighbors = neighbors.filter(n => n.distance <= model.maxDistance)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, model.k);
 
   if (neighbors.length === 0) {
-    console.warn("No neighbors found");
     return undefined;
   }
 

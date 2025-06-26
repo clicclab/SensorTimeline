@@ -136,11 +136,19 @@
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
 
+        const dists = [];
+
+        for (let i = 0; i < labeledSegments.length; i++) {
+            for (let j = i + 1; j < labeledSegments.length; j++) {
+                const dist = dtwDistance(labeledSegments[i].data, labeledSegments[j].data);
+                dists.push(dist);
+            }
+        }
 
         // Adjust maxDistance based on distance between points
-        const maxDistanceAdjusted = maxDistance * Math.sqrt(
-            (maxX - minX) ** 2 + (maxY - minY) ** 2
-        );
+        const maxDistanceAdjusted = maxDistance * Math.max(
+            ...dists
+        ) * Math.sqrt(labeledSegments[0].data[0].length);
 
         const model = createKnnClassifierModel(
             labeledSegments.map(({ label, data }) => ({ label, data })),
@@ -151,6 +159,7 @@
         modelStore.set(model); // Save model to store for use in test step
         const model2d: KnnClassifierModel = {
             ...model,
+            maxDistance, // Use original maxDistance for classification on MDS points
             segments: mdsPoints.map((pt, i) => ({
             label: labeledSegments[i].label,
             data: [[

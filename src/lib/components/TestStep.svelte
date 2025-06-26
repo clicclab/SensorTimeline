@@ -213,8 +213,6 @@
             return;
         }
         
-        console.log('Predicting label for last 50 data points');
-        
         const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
         
         if (isNNModel(model)) {
@@ -223,14 +221,11 @@
             predictedLabel = typeof result === 'string' ? result : null;
         } else if (isKnnModel(model)) {
             const result = classifyWithKnnModel(model, data, dtwDistance);
-            console.log('k-NN prediction result:', result);
             predictedLabel = typeof result === 'string' ? result : null;
         } else {
             predictedLabel = null;
         }
     }
-
-    $inspect(predictedLabel);
 
     // MDS plot state for k-NN model
     let mdsPoints: number[][][] = $state([]);
