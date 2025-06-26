@@ -7,4 +7,7 @@ export default defineConfig({
 	server: {
 		allowedHosts: ['localhost', '.loca.lt'],
 	},
+	esbuild: {
+		target: 'esnext',
+	},
 });
