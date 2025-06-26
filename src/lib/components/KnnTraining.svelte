@@ -204,7 +204,7 @@
       <span class="font-medium">Max Distance</span>
       <input
         type="range"
-        min="0.1"
+        min="0.2"
         max="1"
         step="0.1"
         bind:value={maxDistance}
