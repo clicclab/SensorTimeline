@@ -254,7 +254,7 @@
         <p class="text-gray-600 mb-2">Unknown Model Type</p>
       {/if}
     </div>
-    {#if isKnnModel(model) && mdsPoints.length >= 2}
+    {#if model && mdsPoints.length >= 2}
       <div class="mb-6 relative">
         <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
         <MdsPlot
