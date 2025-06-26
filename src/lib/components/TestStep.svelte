@@ -1,6 +1,5 @@
 <script lang="ts">
     import { modelStore } from "$lib/modelStore";
-    import { get } from "svelte/store";
     import { nnPredict, type NNClassifierModel } from "$lib/nn";
     import { knnClassify, knnModelClassify, type KnnClassifierModel } from "$lib/knn";
     import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
@@ -14,11 +13,8 @@
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import { browser } from "$app/environment";
     import DynamicTimeWarping from "dynamic-time-warping-ts";
-    import { on } from "svelte/events";
     import { onDestroy } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
-    import { mdsClassic } from "$lib/mds";
-    import type { LabeledRecording } from "$lib/components/LabeledRecordings.ts";
     import { flattenSegment } from "$lib/nn";
 
 
@@ -246,7 +242,6 @@
         return acc;
       }, {} as Record<string, string>)
     );
-    let projectedPoint: number[] | null = $state(null);
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center mb-6">
@@ -289,6 +284,17 @@
   {/if}
 </div>
 
+{#if accelerometerData}
+    <div class="bg-white rounded-lg p-4 shadow-sm mb-4 mt-4">
+        <div class="flex items-center justify-between">
+            <h3 class="font-medium text-gray-900">Live Prediction</h3>
+            <span class="text-lg font-mono px-3 py-1 rounded bg-blue-100 text-blue-700" aria-live="polite">
+                {predictedLabel ?? '—'}
+            </span>
+        </div>
+    </div>
+{/if}
+
 <InputSourceSelector
     {inputSource}
     onChange={(val) => (inputSource = val)}
@@ -319,22 +325,13 @@
         useMock={useMockMicroBit}
     />
 {/if}
+
 <div class=" mt-4">
     <WebcamRecorder 
         allowRecording={false}
     />
 </div>
 
-{#if accelerometerData}
-    <div class="bg-white rounded-lg p-4 shadow-sm mb-4 mt-4">
-        <div class="flex items-center justify-between">
-            <h3 class="font-medium text-gray-900">Live Prediction</h3>
-            <span class="text-lg font-mono px-3 py-1 rounded bg-blue-100 text-blue-700" aria-live="polite">
-                {predictedLabel ?? '—'}
-            </span>
-        </div>
-    </div>
-{/if}
 {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
     <div class="bg-gray-50 rounded-xl p-6 mt-6">
         <div class="flex items-center justify-between mb-4">
