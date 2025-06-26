@@ -72,20 +72,17 @@
       return all;
     }
 
-
     // Compute DTW distance between two segments
     export function dtwDistance(a: number[][], b: number[][]): number {
-    const seqA = a.map(v => [v[0], v[1], v[2]]);
-    const seqB = b.map(v => [v[0], v[1], v[2]]);
-    const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
-        Math.pow(x[0] - y[0], 2) +
-        Math.pow(x[1] - y[1], 2) +
-        Math.pow(x[2] - y[2], 2)
-    ));
-    return dtw.getDistance();
+        const seqA = a.map(v => [v[0], v[1], v[2]]);
+        const seqB = b.map(v => [v[0], v[1], v[2]]);
+        const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
+            Math.pow(x[0] - y[0], 2) +
+            Math.pow(x[1] - y[1], 2) +
+            Math.pow(x[2] - y[2], 2)
+        ));
+        return dtw.getDistance();
     }
-
-
 
     // Effect: load segments and compute MDS
     $effect(() => {
@@ -138,11 +135,19 @@
         const ys = mdsPoints.map(p => p[1]);
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+
+        // Adjust maxDistance based on distance between points
+        const maxDistanceAdjusted = maxDistance * Math.sqrt(
+            (maxX - minX) ** 2 + (maxY - minY) ** 2
+        );
+
         const model = createKnnClassifierModel(
             labeledSegments.map(({ label, data }) => ({ label, data })),
             k,
-            maxDistance
+            maxDistanceAdjusted
         );
+
         modelStore.set(model); // Save model to store for use in test step
         const model2d: KnnClassifierModel = {
             ...model,

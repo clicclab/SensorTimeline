@@ -21,18 +21,9 @@ export function euclideanDistance(a: number[][], b: number[][]): number {
   return Math.sqrt(sum);
 }
 
-export function knnModelClassify(
-  model: KnnClassifierModel,
-  query: number[][],
-  distanceFn: (a: number[][], b: number[][]) => number
-): string | undefined {
-  // Use knnClassify with the model's segments
-  return knnClassify(query, model.segments, model.k, model.maxDistance, distanceFn);
-}
-
 export function knnClassify(
   query: number[][],
-  labeledSegments: Array<LabeledRecording & { data: number[][] }>,
+  labeledSegments: Array<{ label: string; data: number[][] }>,
   k: number,
   maxDistance: number,
   distanceFn: (a: number[][], b: number[][]) => number
@@ -98,16 +89,22 @@ export function classifyWithKnnModel(
   query: number[][],
   distanceFn: (a: number[][], b: number[][]) => number
 ): string | undefined {
-  const neighbors: KnnResult[] = model.segments
+  let neighbors: KnnResult[] = model.segments
     .map(seg => ({
       label: seg.label,
       distance: distanceFn(query, seg.data)
-    }))
-    .filter(n => n.distance <= model.maxDistance)
+    }));
+
+  console.log("Neighbors before filtering:", neighbors);
+
+  neighbors = neighbors.filter(n => n.distance <= model.maxDistance)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, model.k);
 
-  if (neighbors.length === 0) return undefined;
+  if (neighbors.length === 0) {
+    console.warn("No neighbors found");
+    return undefined;
+  }
 
   const votes: Record<string, number> = {};
   for (const n of neighbors) {

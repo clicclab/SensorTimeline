@@ -1,7 +1,7 @@
 <script lang="ts">
     import { modelStore } from "$lib/modelStore";
     import { nnPredict, type NNClassifierModel } from "$lib/nn";
-    import { knnClassify, knnModelClassify, type KnnClassifierModel } from "$lib/knn";
+    import { classifyWithKnnModel, type KnnClassifierModel } from "$lib/knn";
     import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
     import WebcamRecorder from "$lib/components/WebcamRecorder.svelte";
     import Peer from "peerjs";
@@ -16,6 +16,7 @@
     import { onDestroy } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { flattenSegment } from "$lib/nn";
+    import { data } from "@tensorflow/tfjs";
 
 
     type TestStepProps = {
@@ -45,9 +46,6 @@
 
     // Prediction state
     let predictedLabel: string | null = $state(null);
-
-    // Allow recording if input is available (for demo, always true in test step)
-    let allowRecording = $derived(inputSource === 'webrtc' ? !!connection : inputSource === 'microbit' ? isMicroBitConnected : false);
 
     $inspect(model);
 
@@ -160,19 +158,17 @@
     });
           
     let predictInterval: NodeJS.Timeout | null = null;
+    let mdsUpdateInterval: NodeJS.Timeout | null = null;
 
     if(browser) {
         predictInterval = setInterval(() => {
-            if (accelerometerData) {
+            if (dataHistory.length >= 50) {
                 // Update the predicted label every second
                 predictLabel();
             }
-        }, 1000);
-    }
+        }, 500);
 
-    let mdsUpdateInterval: NodeJS.Timeout | null = null;
-
-    if (browser) {
+        // Update MDS points every 100ms
         mdsUpdateInterval = setInterval(() => {
             if (isKnnModel(model) && dataHistory.length >= 50) {
                 const segments = model.segments;
@@ -211,17 +207,23 @@
             predictedLabel = null;
             return;
         }
+
         if (dataHistory.length < 50) {
             predictedLabel = null;
             return;
         }
+        
+        console.log('Predicting label for last 50 data points');
+        
         const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
+        
         if (isNNModel(model)) {
             const flat = flattenSegment(data, 50 * 1); // 50 timesteps, 3 features
             const result = nnPredict(model, flat);
             predictedLabel = typeof result === 'string' ? result : null;
         } else if (isKnnModel(model)) {
-            const result = knnModelClassify(model, data, dtwDistance);
+            const result = classifyWithKnnModel(model, data, dtwDistance);
+            console.log('k-NN prediction result:', result);
             predictedLabel = typeof result === 'string' ? result : null;
         } else {
             predictedLabel = null;
