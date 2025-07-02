@@ -1,7 +1,7 @@
 <script lang="ts">
 	type Props = {
-		inputSource: 'webrtc' | 'microbit' | 'pose';
-		onChange: (val: 'webrtc' | 'microbit' | 'pose') => void;
+		inputSource: 'webrtc' | 'microbit' | 'pose' | null;
+		onChange: (val: 'webrtc' | 'microbit' | 'pose' | null) => void;
 	};
 	let { inputSource, onChange }: Props = $props();
 </script>

@@ -12,6 +12,7 @@ import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
 import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
+import PoseInputController from "$lib/components/PoseInputController.svelte";
 
 // Props
  type Props = {
@@ -296,6 +297,8 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
             onConnectionChange={handleMicroBitConnectionChange}
             useMock={useMockMicroBit}
         />
+    {:else if inputSource === 'pose'}
+        <PoseInputController />
     {/if}
     <WebcamRecorder 
         onRecordingStart={handleRecordingStart}

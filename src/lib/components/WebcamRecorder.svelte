@@ -1,23 +1,34 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
+    import { DrawingUtils, FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 
-    export let onRecordingStart: ((startTime: number) => void) | undefined = undefined;
-    export let onRecordingStop: ((endTime: number, videoBlob: Blob) => void) | undefined = undefined;
-    export let onRecordingData: ((timestamp: number) => void) | undefined = undefined;
+    type Props = {
+        onRecordingStart?: (startTime: number) => void;
+        onRecordingStop?: (endTime: number, videoBlob: Blob) => void;
+        onRecordingData?: (timestamp: number) => void;
+        allowRecording?: boolean;
+    };
+    let {
+        onRecordingStart = undefined,
+        onRecordingStop = undefined,
+        onRecordingData = undefined,
+        allowRecording = true
+    }: Props = $props();
 
-    // New prop: allowRecording
-    export let allowRecording: boolean = true;
-
+    let enablePoseDetection = $state(false);
     let videoElement: HTMLVideoElement;
     let stream: MediaStream | null = null;
     let mediaRecorder: MediaRecorder | null = null;
     let recordedChunks: Blob[] = [];
-    let isRecording = false;
-    let hasPermission = false;
-    let permissionError = '';
+    let isRecording = $state(false);
+    let hasPermission = $state(false);
+    let permissionError = $state('');
     let recordingStartTime = 0;
-    let recordingDuration = 0;
+    let recordingDuration = $state(0);
     let durationInterval: ReturnType<typeof setInterval> | null = null;
+    let poseRunner: PoseLandmarker | null = null;
+    let poseReady = $state(false);
+    let poseError = $state('');
 
     // Request webcam access
     async function requestWebcamAccess() {
@@ -124,11 +135,105 @@
         if (durationInterval) {
             clearInterval(durationInterval);
         }
+        stopPoseDetectionLoop();
     });
 
     // Auto-request permission on mount
     onMount(() => {
         requestWebcamAccess();
+    });
+
+    async function setupPoseDetection() {
+        poseError = '';
+        try {
+            const filesetResolver = await FilesetResolver.forVisionTasks(
+                // CDN or local path to mediapipe models
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+            );
+            poseRunner = await PoseLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task',
+                    delegate: 'GPU',
+                },
+                runningMode: 'VIDEO',
+                numPoses: 1,
+            });
+            poseReady = true;
+
+            if (enablePoseDetection && poseReady && videoElement) {
+                startPoseDetectionLoop();
+            }
+        } catch (e) {
+            poseError = e instanceof Error ? e.message : 'Failed to load pose detection';
+            poseReady = false;
+        }
+    }
+
+    let poseDetectionFrame: number | null = null;
+
+    function startPoseDetectionLoop() {
+        if (!enablePoseDetection || !poseReady || !videoElement || !poseRunner) return;
+        const detect = async () => {
+            if (!enablePoseDetection || !poseReady || !videoElement || !poseRunner) return;
+            if (videoElement.readyState >= 2) {
+                const result = await poseRunner.detectForVideo(videoElement, performance.now());
+                if (result && result.landmarks && result.landmarks.length > 0) {
+                    drawPoseLandmarks(result.landmarks[0]);
+                } else if (poseCanvas) {
+                    const ctx = poseCanvas.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+                }
+            }
+            poseDetectionFrame = requestAnimationFrame(detect);
+        };
+        poseDetectionFrame = requestAnimationFrame(detect);
+    }
+
+    function stopPoseDetectionLoop() {
+        if (poseDetectionFrame !== null) {
+            cancelAnimationFrame(poseDetectionFrame);
+            poseDetectionFrame = null;
+        }
+        if (poseCanvas) {
+            const ctx = poseCanvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+        }
+    }
+
+    $effect(() => {
+        if (enablePoseDetection && poseReady && videoElement && poseRunner) {
+            startPoseDetectionLoop();
+        } else {
+            stopPoseDetectionLoop();
+        }
+    });
+
+    let poseCanvas: HTMLCanvasElement | null = $state(null);
+
+    function drawPoseLandmarks(landmarks: any[]) {
+        if (!poseCanvas || !videoElement) return;
+        const ctx = poseCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+
+        const drawer = new DrawingUtils(ctx);
+        drawer.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
+            color: '#00FF00',
+            lineWidth: 2
+        });
+        ctx.restore();
+    }
+
+    $effect(() => {
+        if (enablePoseDetection && !poseReady) {
+            setupPoseDetection();
+        }
+    });
+
+    $effect(() => {
+        if (!enablePoseDetection && poseDetectionFrame !== null) {
+            stopPoseDetectionLoop();
+        }
     });
 </script>
 
@@ -157,7 +262,13 @@
             playsinline
             class="w-full aspect-video bg-gray-900 rounded-lg object-cover"
         ></video>
-        
+        {#if enablePoseDetection}
+            <canvas
+                bind:this={poseCanvas}
+                class="absolute inset-0 w-full h-full pointer-events-none"
+                style="z-index:10;"
+            ></canvas>
+        {/if}
         {#if !hasPermission}
             <div class="absolute inset-0 bg-gray-900 rounded-lg flex items-center justify-center">
                 <div class="text-center text-white">
@@ -216,6 +327,25 @@
             {/if}
         </div>
     {/if}
+
+    <!-- Pose Detection Control -->
+    <div class="flex items-center gap-4 mb-4">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input
+                type="checkbox"
+                bind:checked={enablePoseDetection}
+                class="accent-green-500"
+            />
+            <span class="text-sm text-gray-700">Enable Pose Detection (MediaPipe)</span>
+        </label>
+        {#if enablePoseDetection}
+            {#if !poseReady && !poseError}
+                <span class="text-xs text-gray-500">Loading pose model...</span>
+            {:else if poseError}
+                <span class="text-xs text-red-500">{poseError}</span>
+            {/if}
+        {/if}
+    </div>
 
     <!-- Recording Status -->
     {#if isRecording}
