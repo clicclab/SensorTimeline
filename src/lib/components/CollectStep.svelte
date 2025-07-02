@@ -304,6 +304,7 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
         onRecordingStart={handleRecordingStart}
         onRecordingStop={handleRecordingStop}
         {allowRecording}
+        enablePoseDetection={inputSource === 'pose' ? true : false}
     />
     {#if recordings.length > 0}
         <RecordingsList 

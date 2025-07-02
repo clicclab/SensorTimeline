@@ -7,15 +7,16 @@
         onRecordingStop?: (endTime: number, videoBlob: Blob) => void;
         onRecordingData?: (timestamp: number) => void;
         allowRecording?: boolean;
+        enablePoseDetection?: boolean;
     };
     let {
         onRecordingStart = undefined,
         onRecordingStop = undefined,
         onRecordingData = undefined,
-        allowRecording = true
+        allowRecording = true,
+        enablePoseDetection = false
     }: Props = $props();
 
-    let enablePoseDetection = $state(false);
     let videoElement: HTMLVideoElement;
     let stream: MediaStream | null = null;
     let mediaRecorder: MediaRecorder | null = null;
@@ -330,14 +331,6 @@
 
     <!-- Pose Detection Control -->
     <div class="flex items-center gap-4 mb-4">
-        <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input
-                type="checkbox"
-                bind:checked={enablePoseDetection}
-                class="accent-green-500"
-            />
-            <span class="text-sm text-gray-700">Enable Pose Detection (MediaPipe)</span>
-        </label>
         {#if enablePoseDetection}
             {#if !poseReady && !poseError}
                 <span class="text-xs text-gray-500">Loading pose model...</span>
