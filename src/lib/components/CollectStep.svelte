@@ -36,7 +36,7 @@ let isMicroBitConnected: boolean = $state(false);
 let useMockMicroBit = $state(false);
 
 // Input source
-let inputSource: 'webrtc' | 'microbit' = $state('microbit');
+let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
 
 // Recording state
 let isRecording: boolean = $state(false);
