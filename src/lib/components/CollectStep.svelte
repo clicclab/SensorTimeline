@@ -216,7 +216,7 @@ $effect(() => {
 });
 
 // Derived
-let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected));
+let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected) || inputSource === 'pose');
 
 </script>
 

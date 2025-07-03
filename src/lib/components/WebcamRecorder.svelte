@@ -302,7 +302,7 @@
             {#if !isRecording}
                 <button 
                     onclick={startRecording}
-                    disabled={!hasPermission || !allowRecording}
+                    disabled={!hasPermission || !allowRecording || (!poseReady && enablePoseDetection)}
                     class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
                 >
                     <span>🔴</span>
