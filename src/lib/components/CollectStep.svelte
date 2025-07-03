@@ -42,12 +42,7 @@ let useMockMicroBit = $state(false);
 let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
 
 $effect(() => {
-    if (session.type === 'accelerometer') {
-        // Default to 'webrtc' if not set, but allow switching
-        if (inputSource !== 'webrtc' && inputSource !== 'microbit') {
-            inputSource = 'webrtc';
-        }
-    } else if (session.type === 'pose') {
+    if (session.type === 'pose') {
         inputSource = 'pose';
     }
 });

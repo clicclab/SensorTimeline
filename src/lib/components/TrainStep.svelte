@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { LocalStore } from "$lib/localStore";
+    import type { Session } from "$lib/session";
     import type { Recording } from "./LabeledRecordings.ts";
     import LabeledRecordingsList from "./LabeledRecordingsList.svelte";
     import ModelTypeSelector from "./ModelTypeSelector.svelte";
@@ -11,40 +11,11 @@
     type TrainStepProps = {
         stepBack: () => void;
         stepForward: () => void;
+        session: Session;
     };
+    let { stepBack, stepForward, session }: TrainStepProps = $props();
 
-    let { stepBack, stepForward }: TrainStepProps = $props();
-
-    let recordingsStore: LocalStore<any> | null = $state.raw(null);
-    let recordings: Array<Recording> = $state([]);
-
-    // On mount: initialize recordings store and load
-    if (typeof window !== "undefined") {
-        LocalStore.create<Array<Recording>>("saved-recordings", []).then(
-            (store) => {
-                recordingsStore = store;
-                recordings = loadRecordings();
-            },
-        );
-    }
-
-    function loadRecordings(): Array<Recording> {
-        if (!recordingsStore) return [];
-        const raw = recordingsStore.get() || [];
-        return raw.map((rec: any) => {
-            if (
-                rec.videoBlob &&
-                typeof rec.videoBlob === "object" &&
-                rec.videoBlob.base64 &&
-                rec.videoBlob.type
-            ) {
-                return {
-                    ...rec,
-                };
-            }
-            return rec;
-        });
-    }
+    let recordings: Array<Recording> = $state(session.recordings);
 
     // Add ModelType type for clarity
     export type ModelType = "neural" | "knn";

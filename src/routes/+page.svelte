@@ -4,6 +4,7 @@
     import TrainStep from "$lib/components/TrainStep.svelte";
     import TestStep from "$lib/components/TestStep.svelte";
     import SessionSetup from "$lib/components/SessionSetup.svelte";
+    import SessionInfoHeader from "$lib/components/SessionInfoHeader.svelte";
     import { getSessionById, type Session } from "$lib/session";
     import { onMount } from "svelte";
     
@@ -68,26 +69,27 @@
                     step = 'collect';
                 }} />
             {:else if step === 'collect'}
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <span class="text-sm text-gray-500">Session:</span>
-                        <span class="ml-2 px-2 py-1 rounded bg-gray-100 text-gray-700 font-mono">{activeSession?.id}</span>
-                        <span class="ml-2 px-2 py-1 rounded bg-blue-100 text-blue-700 font-semibold">{activeSession?.type}</span>
-                    </div>
-                    <button onclick={handleSessionReset} class="text-xs px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200">Reset Session</button>
-                </div>
                 {#if activeSession}
+                    <SessionInfoHeader session={activeSession} onReset={handleSessionReset} />
                     <CollectStep stepForward={() => (step = 'train')} session={activeSession} />
                 {/if}
             {:else if step === 'train'}
-                <TrainStep
-                    stepBack={() => (step = 'collect')}
-                    stepForward={() => (step = 'test')}
-                />
+                {#if activeSession}
+                    <SessionInfoHeader session={activeSession} onReset={handleSessionReset} />
+                    <TrainStep
+                        stepBack={() => (step = 'collect')}
+                        stepForward={() => (step = 'test')}
+                        session={activeSession}
+                    />
+                {/if}
             {:else if step === 'test'}
-                <TestStep
-                    stepBack={() => (step = 'train')}
-                />
+                {#if activeSession}
+                    <SessionInfoHeader session={activeSession} onReset={handleSessionReset} />
+                    <TestStep
+                        stepBack={() => (step = 'train')}
+                        session={activeSession}
+                    />
+                {/if}
             {/if}
         </div>
         <!-- Footer -->

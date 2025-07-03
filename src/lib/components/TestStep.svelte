@@ -16,14 +16,15 @@
     import { onDestroy, onMount } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { flattenSegment } from "$lib/nn";
-    import { data } from "@tensorflow/tfjs";
     import type { AccelerometerDataPoint } from "$lib/types";
+    import type { Session } from "$lib/session";
 
 
     type TestStepProps = {
         stepBack: () => void;
+        session: Session;
     };
-    let { stepBack }: TestStepProps = $props();
+    let { stepBack, session }: TestStepProps = $props();
 
     let model: NNClassifierModel | KnnClassifierModel | null = $state(null);
 
@@ -61,6 +62,7 @@
     function handleIdChange(id: string) {
         otherId = id;
     }
+
     function handleConnect() {
         if (peer && otherId) {
             const conn = peer.connect(otherId);
@@ -76,6 +78,7 @@
             conn.on('error', (err) => {});
         }
     }
+
     function handleDisconnect() {
         clearDataHistory();
         if (connection) {
@@ -83,6 +86,7 @@
             connection = null;
         }
     }
+
     function handleIncomingData(rawData: any) {
         try {
             const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
@@ -93,11 +97,13 @@
             }
         } catch (error) {}
     }
+
     function clearDataHistory() {
         dataHistory = [];
         accelerometerData = null;
         isReceivingData = false;
     }
+
     function handleMicroBitData(x: number, y: number, z: number) {
         const timestamp = Date.now();
         const newData = { x, y, z, timestamp };
@@ -105,6 +111,7 @@
         dataHistory = [...dataHistory.slice(-99), newData];
         isReceivingData = true;
     }
+
     function handleMicroBitConnectionChange(connected: boolean) {
         isMicroBitConnected = connected;
         if (!connected && inputSource === 'microbit') {
@@ -162,6 +169,7 @@
             peerStatus = null;
         }
     });
+
     $effect(() => {
         clearDataHistory();
     });
@@ -211,6 +219,7 @@
     function isKnnModel(model: any): boolean {
       return model && Array.isArray(model.segments);
     }
+    
     function isNNModel(model: any): boolean {
       return model && Array.isArray(model.outputLabels);
     }
@@ -254,6 +263,13 @@
         return acc;
       }, {} as Record<string, string>)
     );
+
+    // Set inputSource based on session.type, and allow switching only for accelerometer
+    $effect(() => {
+        if (session.type === 'pose') {
+            inputSource = 'pose';
+        }
+    });
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center mb-6">
@@ -307,10 +323,12 @@
     </div>
 {/if}
 
-<InputSourceSelector
-    {inputSource}
-    onChange={(val) => (inputSource = val)}
-/>
+{#if session.type === 'accelerometer'}
+    <InputSourceSelector
+        {inputSource}
+        onChange={(val) => (inputSource = val)}
+    />
+{/if}
 {#if inputSource === 'webrtc'}
     <div class="mb-8 p-6 bg-gray-50 rounded-xl">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -341,6 +359,7 @@
 <div class=" mt-4">
     <WebcamRecorder 
         allowRecording={false}
+        enablePoseDetection={inputSource === 'pose'}
     />
 </div>
 
