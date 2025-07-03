@@ -1,17 +1,11 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import VideoControlsWithChart from './VideoControlsWithChart.svelte';
-    import type { AccelerometerDataPoint } from '$lib/types';
+    import type { AccelerometerDataPoint, Recording } from '$lib/types';
+    import { formatTime } from "$lib/formatUtils";
 
     type Props = {
-        recording: {
-            id: string;
-            startTime: number;
-            endTime: number;
-            videoBlob: Blob;
-            sensorData: Array<AccelerometerDataPoint>;
-            duration: number;
-        } | null;
+        recording: Recording | null;
         onClose?: () => void;
         savedSelections?: Array<{t0: number, t1: number, label: string}>;
     };
@@ -81,17 +75,6 @@
         if (!videoElement) return;
         videoElement.currentTime = seconds;
         updateSensorData();
-    }
-
-    function formatTime(seconds: number): string {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-
-        if (mins >= 1) {
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        } else {
-            return `00:${secs.toString().padStart(2, '0')}.${Math.floor((seconds % 1) * 100).toString().padStart(2, '0')}`;
-        }
     }
 
     // Setup video URL when recording changes (Svelte 5 style)

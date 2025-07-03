@@ -1,5 +1,6 @@
 <script lang="ts">
     import LabeledRecordingsList from "$lib/components/LabeledRecordingsList.svelte";
+    import { formatDuration, formatFileSize } from "$lib/formatUtils";
     import type { Recording } from "$lib/types";
 
     type Props = {
@@ -14,19 +15,6 @@
     };
 
     let { recordings = [], onDeleteRecording, onPlayRecording, savedSelections = $bindable([]) }: Props = $props();
-
-    function formatDuration(ms: number): string {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        
-        return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-
-    function formatFileSize(bytes: number): string {
-        const mb = bytes / (1024 * 1024);
-        return `${mb.toFixed(1)} MB`;
-    }
 
     function downloadVideo(recording: any) {
         const url = URL.createObjectURL(recording.videoBlob);

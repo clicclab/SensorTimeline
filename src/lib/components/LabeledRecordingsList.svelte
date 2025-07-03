@@ -1,5 +1,6 @@
 <script lang="ts">
     import { LocalStore } from "$lib/localStore";
+    import { formatDuration } from "$lib/formatUtils";
     import type { LabeledRecording, Recording } from "$lib/types";
     import Sparkline from "./ui/Sparkline.svelte";
 
@@ -48,13 +49,6 @@ function getLabeledSensorData(labeled: LabeledRecording, recordings: Recording[]
 	const t0Abs = labeled.t0 < 1e12 ? labeled.recordingStartTime + labeled.t0 : labeled.t0;
 	const t1Abs = labeled.t1 < 1e12 ? labeled.recordingStartTime + labeled.t1 : labeled.t1;
 	return parent.sensorData.filter(d => d.timestamp >= t0Abs && d.timestamp <= t1Abs);
-}
-
-function formatDuration(ms: number): string {
-	const seconds = Math.floor(ms / 1000);
-	const minutes = Math.floor(seconds / 60);
-	const remainingSeconds = seconds % 60;
-	return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 </script>
 
