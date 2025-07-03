@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import VideoControlsWithChart from './VideoControlsWithChart.svelte';
+    import type { AccelerometerDataPoint } from '$lib/types';
 
     type Props = {
         recording: {
@@ -8,7 +9,7 @@
             startTime: number;
             endTime: number;
             videoBlob: Blob;
-            sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+            sensorData: Array<AccelerometerDataPoint>;
             duration: number;
         } | null;
         onClose?: () => void;
@@ -24,8 +25,8 @@
     let playbackInterval: ReturnType<typeof setInterval> | null = null;
     
     // Full sensor data and current position
-    let currentSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
-    let currentReading: {x: number, y: number, z: number, timestamp: number} | null = null;
+    let currentSensorData: Array<AccelerometerDataPoint> = $state([]);
+    let currentReading: AccelerometerDataPoint | null = null;
     let currentTimelinePosition = $state(0); // Position in the timeline (0-1)
     let videoDuration = $state(0); // Duration in milliseconds
     let videoReady = $state(false); // Whether video metadata is ready

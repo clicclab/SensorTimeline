@@ -17,6 +17,7 @@
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { flattenSegment } from "$lib/nn";
     import { data } from "@tensorflow/tfjs";
+    import type { AccelerometerDataPoint } from "$lib/types";
 
 
     type TestStepProps = {
@@ -34,7 +35,7 @@
         });
     });
 
-    let inputSource: 'webrtc' | 'microbit' = $state('microbit');
+    let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state('microbit');
 
     // PeerJS state
     let peer: Peer | null = $state.raw(null);
@@ -44,8 +45,8 @@
     let otherId: string = $state('');
 
     // Accelerometer state
-    let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
-    let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
+    let accelerometerData: AccelerometerDataPoint | null = $state(null);
+    let dataHistory: Array<AccelerometerDataPoint> = $state([]);
     let isReceivingData: boolean = $state(false);
 
     // micro:bit state
@@ -178,15 +179,19 @@
 
         // Update MDS points every 100ms
         mdsUpdateInterval = setInterval(() => {
-            if (isKnnModel(model) && dataHistory.length >= 50) {
-                const segments = model.segments;
-                const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
-                mdsLabels = [...segments.map(s => s.label), 'Current Data'];
-                mdsPoints = [...segments.map(s => s.data), data];
-            } else if (isKnnModel(model)) {
-                const segments = model.segments;
-                mdsLabels = segments.map(s => s.label);
-                mdsPoints = segments.map(s => s.data);
+            if (!model) return;
+            if (isKnnModel(model)) {
+                let knnModel = model as KnnClassifierModel;
+                if(dataHistory.length >= 50) {
+                    const segments = knnModel.segments;
+                    const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
+                    mdsLabels = [...segments.map(s => s.label), 'Current Data'];
+                    mdsPoints = [...segments.map(s => s.data), data];
+                } else {
+                    const segments = knnModel.segments;
+                    mdsLabels = segments.map(s => s.label);
+                    mdsPoints = segments.map(s => s.data);
+                }
             } else {
                 mdsLabels = [];
                 mdsPoints = [];
@@ -224,11 +229,13 @@
         const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
         
         if (isNNModel(model)) {
+            let nnModel = model as NNClassifierModel;
             const flat = flattenSegment(data, 50 * 1); // 50 timesteps, 3 features
-            const result = nnPredict(model, flat);
+            const result = nnPredict(nnModel, flat);
             predictedLabel = typeof result === 'string' ? result : null;
         } else if (isKnnModel(model)) {
-            const result = classifyWithKnnModel(model, data, dtwDistance);
+            let knnModel = model as KnnClassifierModel;
+            const result = classifyWithKnnModel(knnModel, data, dtwDistance);
             predictedLabel = typeof result === 'string' ? result : null;
         } else {
             predictedLabel = null;

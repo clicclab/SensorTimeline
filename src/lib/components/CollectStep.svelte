@@ -14,6 +14,7 @@ import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
 import { base64ToBlob, blobToBase64 } from "$lib/blobUtils";
+import type { AccelerometerDataPoint } from "$lib/types";
 
 // Props
  type Props = {
@@ -29,8 +30,8 @@ let connection: DataConnection | null = $state.raw(null);
 let otherId: string = $state('');
 
 // Accelerometer state
-let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
-let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
+let accelerometerData: AccelerometerDataPoint | null = $state(null);
+let dataHistory: Array<AccelerometerDataPoint> = $state([]);
 let isReceivingData: boolean = $state(false);
 
 // micro:bit state
@@ -43,7 +44,7 @@ let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
 // Recording state
 let isRecording: boolean = $state(false);
 let recordingStartTime: number = 0;
-let recordingSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+let recordingSensorData: Array<AccelerometerDataPoint> = [];
 
 // Recordings store
 let recordingsStore: LocalStore<any> | null = $state.raw(null);
@@ -52,7 +53,7 @@ let recordings: Array<{
     startTime: number;
     endTime: number;
     videoBlob: Blob;
-    sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+    sensorData: Array<AccelerometerDataPoint>;
     duration: number;
 }> = $state([]);
 
@@ -67,7 +68,7 @@ if (browser) {
         startTime: number;
         endTime: number;
         videoBlob: Blob;
-        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
+        sensorData: Array<AccelerometerDataPoint>;
         duration: number;
     }>>("saved-recordings", []).then(store => {
         recordingsStore = store;
