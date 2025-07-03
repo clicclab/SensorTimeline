@@ -14,7 +14,7 @@ import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
 import { base64ToBlob, blobToBase64 } from "$lib/blobUtils";
-import type { AccelerometerDataPoint } from "$lib/types";
+import type { AccelerometerDataPoint, Recording } from "$lib/types";
 
 // Props
  type Props = {
@@ -48,14 +48,7 @@ let recordingSensorData: Array<AccelerometerDataPoint> = [];
 
 // Recordings store
 let recordingsStore: LocalStore<any> | null = $state.raw(null);
-let recordings: Array<{
-    id: string;
-    startTime: number;
-    endTime: number;
-    videoBlob: Blob;
-    sensorData: Array<AccelerometerDataPoint>;
-    duration: number;
-}> = $state([]);
+let recordings: Recording[] = $state([]);
 
 // Playback modal state
 let selectedRecording: any = $state(null);

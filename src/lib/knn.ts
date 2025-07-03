@@ -1,5 +1,3 @@
-import { type LabeledRecording } from "./components/LabeledRecordings.ts";
-
 export type KnnResult = {
   label: string;
   distance: number;

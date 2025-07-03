@@ -6,8 +6,6 @@
     import NeuralNetworkTraining from "./NeuralNetworkTraining.svelte";
     import KnnTraining from "./KnnTraining.svelte";
     import { initModelStore, modelStore } from "$lib/modelStore";
-    import type { NNClassifierModel } from "$lib/nn.js";
-    import type { KnnClassifierModel } from "$lib/knn.js";
     import { onMount } from "svelte";
 
     type TrainStepProps = {
@@ -57,7 +55,7 @@
     onMount(async () => {
         // Initialize model store
         await initModelStore();
-        
+
         const model = modelStore.get();
         hasModel = model !== null;
     });

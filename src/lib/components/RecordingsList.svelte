@@ -1,16 +1,9 @@
 <script lang="ts">
     import LabeledRecordingsList from "$lib/components/LabeledRecordingsList.svelte";
-    import type { AccelerometerDataPoint } from "$lib/types";
+    import type { Recording } from "$lib/types";
 
     type Props = {
-        recordings?: Array<{
-            id: string;
-            startTime: number;
-            endTime: number;
-            videoBlob: Blob;
-            sensorData: Array<AccelerometerDataPoint>;
-            duration: number;
-        }>;
+        recordings?: Recording[];
         onDeleteRecording?: (id: string) => void;
         onPlayRecording?: (recording: any) => void;
         savedSelections?: Array<{

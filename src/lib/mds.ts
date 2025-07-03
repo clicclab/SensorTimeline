@@ -35,26 +35,32 @@ export type MDSParams = {
 };
 
 // Helper functions for matrix operations
-function matrixPow(A: number[][], power: number): number[][] {
+export function matrixPow(A: number[][], power: number): number[][] {
     return A.map(row => row.map(x => Math.pow(x, power)));
 }
-function matrixMul(A: number[][], scalar: number): number[][] {
+
+export function matrixMul(A: number[][], scalar: number): number[][] {
     return A.map(row => row.map(x => x * scalar));
 }
-function matrixAdd(...matrices: number[][][]): number[][] {
+
+export function matrixAdd(...matrices: number[][][]): number[][] {
     const [A, ...rest] = matrices;
     return A.map((row, i) => row.map((val, j) => rest.reduce((acc, m) => acc + m[i][j], val)));
 }
-function matrixDiv(A: number[][], scalar: number): number[][] {
+
+export function matrixDiv(A: number[][], scalar: number): number[][] {
     return A.map(row => row.map(x => x / scalar));
 }
-function matrixTranspose(A: number[][]): number[][] {
+
+export function matrixTranspose(A: number[][]): number[][] {
     return A[0].map((_, j) => A.map(row => row[j]));
 }
-function vectorSqrt(v: number[]): number[] {
+
+export function vectorSqrt(v: number[]): number[] {
     return v.map(Math.sqrt);
 }
-function vectorMul(a: number[], b: number[]): number[] {
+
+export function vectorMul(a: number[], b: number[]): number[] {
     return a.map((x, i) => x * b[i]);
 }
 
@@ -65,7 +71,7 @@ export function mdsClassic(distances: number[][], dimensions: number = 2): MDSRe
         return { points: [Array(dimensions).fill(0)], svd: { q: [], u: [], v: [] } };
     }
     // square distances
-    let M = matrixMul(matrixPow(distances, 2), -0.5);
+    const M = matrixMul(matrixPow(distances, 2), -0.5);
 
     // double centre the rows/columns
     function mean(A: number[][]): number[] {
