@@ -1,8 +1,9 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import VideoControlsWithChart from './VideoControlsWithChart.svelte';
-    import type { AccelerometerDataPoint, Recording } from '$lib/types';
+    import type { AccelerometerDataPoint, PoseDataPoint, Recording, RecordingType } from '$lib/types';
     import { formatTime } from "$lib/formatUtils";
+    import { getRecordingType } from "$lib/types";
 
     type Props = {
         recording: Recording | null;
@@ -19,11 +20,15 @@
     let playbackInterval: ReturnType<typeof setInterval> | null = null;
     
     // Full sensor data and current position
-    let currentSensorData: Array<AccelerometerDataPoint> = $state([]);
-    let currentReading: AccelerometerDataPoint | null = null;
+    let currentSensorData: Array<AccelerometerDataPoint | PoseDataPoint> = $state([]);
+    let currentReading: AccelerometerDataPoint | PoseDataPoint | null = null;
     let currentTimelinePosition = $state(0); // Position in the timeline (0-1)
     let videoDuration = $state(0); // Duration in milliseconds
     let videoReady = $state(false); // Whether video metadata is ready
+    let recordingType: RecordingType | null = $state(null);
+
+    // For pose: store flattened data for charting
+    let flattenedPoseData: Array<{ x: number; y: number; z: number; timestamp: number }> = $state([]);
 
     // Sync sensor data with video playback
     function updateSensorData() {
@@ -39,9 +44,21 @@
         const videoCurrentTime = videoElement.currentTime * 1000; // ms
         const absoluteTime = recording.startTime + videoCurrentTime;
         
-        // Show all sensor data from the entire recording
-        currentSensorData = recording.sensorData;
-        
+        // Determine recording type and update sensor data accordingly
+        recordingType = getRecordingType(recording);
+        if (recordingType === 'pose') {
+            // Flatten all landmarks for each frame, use first landmark as x/y/z for chart
+            flattenedPoseData = (recording.sensorData as PoseDataPoint[]).map((d) => ({
+                x: d.landmarks[0]?.x ?? 0,
+                y: d.landmarks[0]?.y ?? 0,
+                z: d.landmarks[0]?.z ?? 0,
+                timestamp: d.timestamp
+            }));
+            currentSensorData = recording.sensorData as PoseDataPoint[];
+        } else {
+            currentSensorData = recording.sensorData as AccelerometerDataPoint[];
+        }
+
         // Calculate timeline position (0-1) for highlighting current position
         currentTimelinePosition = videoCurrentTime / videoDuration;
         
@@ -137,7 +154,6 @@
                         onpause={() => { isPlaying = false; }}
                         ontimeupdate={updateSensorData}
                         onloadedmetadata={() => {
-                            console.log('Video metadata loaded, duration:', videoElement?.duration);
                             videoReady = true;
                             if (videoElement && Number.isFinite(videoElement.duration) && videoElement.duration > 0) {
                                 videoDuration = videoElement.duration * 1000;
@@ -146,7 +162,6 @@
                         }}
                         ondurationchange={() => {
                             if (!videoElement) return;
-                            console.log('Video duration changed:', videoElement?.duration);
                             if (Number.isFinite(videoElement?.duration) && videoElement?.duration > 0) {
                                 videoDuration = videoElement?.duration * 1000;
                             }
@@ -162,7 +177,7 @@
                             formatTime={formatTime}
                             onToggle={togglePlayback}
                             onSeek={seekTo}
-                            sensorData={currentSensorData}
+                            sensorData={recordingType === 'pose' ? flattenedPoseData : (recording.sensorData as AccelerometerDataPoint[])}
                             recordingStartTime={recording.startTime}
                             {savedSelections}
                         />
