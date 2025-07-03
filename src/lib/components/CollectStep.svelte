@@ -56,14 +56,7 @@ let savedSelections: Array<{t0: number, t1: number, label: string}> = $state([])
 
 // On mount: initialize recordings store and load
 if (browser) {
-    LocalStore.create<Array<{
-        id: string;
-        startTime: number;
-        endTime: number;
-        videoBlob: Blob;
-        sensorData: Array<AccelerometerDataPoint>;
-        duration: number;
-    }>>("saved-recordings", []).then(store => {
+    LocalStore.create<Array<Recording>>("saved-recordings", []).then(store => {
         recordingsStore = store;
         recordings = loadRecordings();
     });
