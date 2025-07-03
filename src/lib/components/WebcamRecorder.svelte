@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { DrawingUtils, FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
+    import { DrawingUtils } from '@mediapipe/tasks-vision';
     import type { PoseDataPoint, Vector3 } from '$lib/types';
+    import { getGlobalPoseDetector, cleanupGlobalDetector, convertToPixelCoordinates, MediaPipePoseDetector } from '$lib/mediapipe';
 
     type Props = {
         onRecordingStart?: (startTime: number) => void;
@@ -28,10 +29,10 @@
     let recordingStartTime = 0;
     let recordingDuration = $state(0);
     let durationInterval: ReturnType<typeof setInterval> | null = null;
-    let poseRunner: PoseLandmarker | null = null;
     let poseReady = $state(false);
     let poseError = $state('');
     let poseRecordingData: PoseDataPoint[] = $state([]);
+    let poseDetector: MediaPipePoseDetector | null = null;
 
     // Request webcam access
     async function requestWebcamAccess() {
@@ -148,6 +149,7 @@
             clearInterval(durationInterval);
         }
         stopPoseDetectionLoop();
+        cleanupGlobalDetector();
     });
 
     // Auto-request permission on mount
@@ -157,21 +159,10 @@
 
     async function setupPoseDetection() {
         poseError = '';
+        poseReady = false;
         try {
-            const filesetResolver = await FilesetResolver.forVisionTasks(
-                // CDN or local path to mediapipe models
-                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-            );
-            poseRunner = await PoseLandmarker.createFromOptions(filesetResolver, {
-                baseOptions: {
-                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task',
-                    delegate: 'GPU',
-                },
-                runningMode: 'VIDEO',
-                numPoses: 1,
-            });
+            poseDetector = await getGlobalPoseDetector();
             poseReady = true;
-
             if (enablePoseDetection && poseReady && videoElement) {
                 startPoseDetectionLoop();
             }
@@ -184,20 +175,19 @@
     let poseDetectionFrame: number | null = null;
 
     function startPoseDetectionLoop() {
-        if (!enablePoseDetection || !poseReady || !videoElement || !poseRunner) return;
-        const detect = async () => {
-            if (!enablePoseDetection || !poseReady || !videoElement || !poseRunner) return;
+        if (!enablePoseDetection || !poseReady || !videoElement || !poseDetector) return;
+        const detect = () => {
+            if (!enablePoseDetection || !poseReady || !videoElement || !poseDetector) return;
             if (videoElement.readyState >= 2) {
-                const result = await poseRunner.detectForVideo(videoElement, performance.now());
-                if (result && result.landmarks && result.landmarks.length > 0) {
-                    if(isRecording){
+                const landmarks = poseDetector.detectPose(videoElement);
+                if (landmarks && landmarks.length > 0) {
+                    if (isRecording) {
                         poseRecordingData.push({
                             timestamp: performance.now(),
-                            landmarks: result.worldLandmarks[0] as Vector3[]
+                            landmarks: landmarks as Vector3[]
                         });
                     }
-
-                    drawPoseLandmarks(result.landmarks[0]);
+                    drawPoseLandmarks(landmarks);
                 } else if (poseCanvas) {
                     const ctx = poseCanvas.getContext('2d');
                     if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
@@ -220,7 +210,7 @@
     }
 
     $effect(() => {
-        if (enablePoseDetection && poseReady && videoElement && poseRunner) {
+        if (enablePoseDetection && poseReady && videoElement && poseDetector) {
             startPoseDetectionLoop();
         } else {
             stopPoseDetectionLoop();
@@ -229,16 +219,26 @@
 
     let poseCanvas: HTMLCanvasElement | null = $state(null);
 
-    function drawPoseLandmarks(landmarks: any[]) {
+    function drawPoseLandmarks(landmarks: Vector3[]) {
         if (!poseCanvas || !videoElement) return;
         const ctx = poseCanvas.getContext('2d');
         if (!ctx) return;
         ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
 
-        const drawer = new DrawingUtils(ctx);
-        drawer.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-            color: '#00FF00',
-            lineWidth: 2
+        // Ensure canvas matches video display size for correct scaling
+        const videoRect = videoElement.getBoundingClientRect();
+        poseCanvas.width = videoRect.width;
+        poseCanvas.height = videoRect.height;
+
+        // Convert normalized landmarks to pixel coordinates for drawing
+        const pixelLandmarks = convertToPixelCoordinates(landmarks, videoElement);
+
+        // Draw points
+        pixelLandmarks.forEach(({ x, y }) => {
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00FF00';
+            ctx.fill();
         });
         ctx.restore();
     }
