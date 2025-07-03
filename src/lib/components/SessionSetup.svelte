@@ -1,7 +1,6 @@
 <script lang="ts">
 import type { SessionType, Session } from "$lib/session";
-import { createSession, saveSession } from "$lib/session";
-import { goto } from "$app/navigation";
+import { createSession, getSessions, saveSession } from "$lib/session";
 
 let sessionType: SessionType | null = $state(null);
 let classInput = $state("");
@@ -43,14 +42,40 @@ async function handleStartSession() {
   }
   const session: Session = createSession(sessionType, classes);
   await saveSession(session);
-  // Redirect or emit event to continue to collection step with this session
-  // For now, store session id in localStorage and reload
+  
+  startSession(session);  
+}
+
+function startSession(session: Session) {
   localStorage.setItem("activeSessionId", session.id);
   onSetupComplete?.(session);
 }
+
+let existingSessions = $state<Session[]>([]);
+
+$effect(async () => {
+    existingSessions = await getSessions();
+});
+
 </script>
 
 <div class="max-w-lg mx-auto bg-white rounded-xl shadow p-8 mt-8">
+    {#if existingSessions.length > 0}
+        <h2 class="text-2xl font-bold mb-4">Existing Sessions</h2>
+        <ul class="mb-6">
+            {#each existingSessions as session}
+                <li class="mb-2">
+                    <button 
+                        type="button" 
+                        onclick={() => startSession(session)}
+                        class="w-full text-left px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 focus:ring-2 focus:ring-blue-400 transition-colors"
+                    >
+                        <span class="font-semibold">{session.type}</span> - {session.classes.join(', ')}
+                    </button>
+                </li>
+            {/each}
+        </ul>
+    {/if}
   <h2 class="text-2xl font-bold mb-4">Start a New Session</h2>
   <div class="mb-6">
     <label class="block font-medium mb-2">Data Type</label>
