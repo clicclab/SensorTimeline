@@ -1,17 +1,13 @@
 <script lang="ts">
     import LabeledRecordingsList from "$lib/components/LabeledRecordingsList.svelte";
     import { formatDuration, formatFileSize } from "$lib/formatUtils";
-    import type { Recording } from "$lib/types";
+    import type { LabeledRecording, Recording } from "$lib/types";
 
     type Props = {
         recordings?: Recording[];
         onDeleteRecording?: (id: string) => void;
         onPlayRecording?: (recording: any) => void;
-        savedSelections?: Array<{
-            t0: number;
-            t1: number;
-            label: string;
-        }>;
+        savedSelections?: Array<LabeledRecording>;
     };
 
     let { recordings = [], onDeleteRecording, onPlayRecording, savedSelections = $bindable([]) }: Props = $props();
@@ -135,6 +131,6 @@
             <h3 class="font-medium text-gray-900">Labeled Recordings</h3>
             <!-- Optionally, you can show a count by passing a derived value from the child, or omit for now -->
         </div>
-        <LabeledRecordingsList recordings={recordings} />
+        <LabeledRecordingsList recordings={recordings} bind:labeledRecordings={savedSelections} />
     {/if}
 </div>

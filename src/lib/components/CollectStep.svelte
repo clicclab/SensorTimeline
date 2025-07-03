@@ -12,7 +12,7 @@ import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
-import type { AccelerometerDataPoint, Recording } from "$lib/types";
+import type { AccelerometerDataPoint, LabeledRecording, Recording } from "$lib/types";
 import { saveSession, type Session } from "$lib/session";
 
 // Props
@@ -57,7 +57,9 @@ let recordings: Recording[] = $state(session.recordings);
 
 // Playback modal state
 let selectedRecording: any = $state(null);
-let savedSelections: Array<{t0: number, t1: number, label: string}> = $state([]);
+let savedSelections: Array<LabeledRecording> = $state([]);
+
+$inspect(savedSelections);
 
 // On mount: Check for ?mockmicrobit=1 in the URL
 if (browser) {
@@ -266,7 +268,7 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
             {recordings}
             onDeleteRecording={handleDeleteRecording}
             onPlayRecording={handlePlayRecording}
-            {savedSelections}
+            bind:savedSelections
         />
     {/if}
     <PlaybackModal 
@@ -371,8 +373,9 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
 <div class="flex justify-end mt-8">
     <button
         onclick={stepForward}
-        class="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+        class="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Next: Train Model"
+        disabled={savedSelections.length < 2}
     >
         Next: Train Model &rarr;
     </button>

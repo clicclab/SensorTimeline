@@ -6,10 +6,10 @@
 
 type Props = {
 	recordings: Recording[];
+    labeledRecordings?: LabeledRecording[];
 };
-let { recordings }: Props = $props();
 
-let labeledRecordings: LabeledRecording[] = $state([]);
+let { recordings, labeledRecordings = $bindable([]) }: Props = $props();
 
 async function loadLabeledRecordings() {
 	const all: LabeledRecording[] = [];
