@@ -13,12 +13,13 @@ import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
+import { base64ToBlob, blobToBase64 } from "$lib/blobUtils";
 
 // Props
  type Props = {
     stepForward: () => void;
 };
-let { stepForward } = $props();
+let { stepForward }: Props = $props();
 
 // PeerJS state
 let peer: Peer | null = $state.raw(null);
@@ -77,24 +78,6 @@ if (browser) {
     useMockMicroBit = params.get('mockmicrobit') === '1';
 }
 
-// Helpers for blob encoding
-async function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-function base64ToBlob(base64: string, mimeType: string): Blob {
-    const byteString = atob(base64.split(',')[1]);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([ab], { type: mimeType });
-}
 function loadRecordings(): Array<any> {
     if (!recordingsStore) return [];
     const raw = recordingsStore.get() || [];
