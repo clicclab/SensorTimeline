@@ -63,7 +63,10 @@
 
             <!-- Step Content -->
             {#if step === 'setup'}
-                <SessionSetup onSetupComplete={() => (step = 'collect')} />
+                <SessionSetup onSetupComplete={(session) => {
+                    activeSession = session; 
+                    step = 'collect';
+                }} />
             {:else if step === 'collect'}
                 <div class="flex justify-between items-center mb-6">
                     <div>

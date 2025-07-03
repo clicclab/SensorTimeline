@@ -8,7 +8,7 @@
 
 <div class="mb-8 p-6 bg-gray-50 rounded-xl">
 	<h2 class="text-lg font-semibold text-gray-900 mb-4">Select Input Source</h2>
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 		<label class="relative h-full flex">
 			<input
 				type="radio"

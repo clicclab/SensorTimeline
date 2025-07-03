@@ -1,7 +1,6 @@
 <script lang="ts">
 import Peer, { type DataConnection } from "peerjs";
 import { browser } from "$app/environment";
-import { LocalStore } from "$lib/localStore";
 import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
 import ConnectionSection from "$lib/components/ConnectionSection.svelte";
 import MicroBitController from "$lib/components/MicroBitController.svelte";
@@ -13,14 +12,13 @@ import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
-import { base64ToBlob, blobToBase64 } from "$lib/blobUtils";
 import type { AccelerometerDataPoint, Recording } from "$lib/types";
-    import { saveSession } from "$lib/session";
+import { saveSession, type Session } from "$lib/session";
 
 // Props
  type Props = {
     stepForward: () => void;
-    session: import('$lib/session').Session;
+    session: Session;
 };
 let { stepForward, session }: Props = $props();
 
@@ -41,9 +39,18 @@ let isMicroBitConnected: boolean = $state(false);
 let useMockMicroBit = $state(false);
 
 // Input source
-let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $derived(
-    session.type === 'accelerometer' ? 'webrtc' : session.type === 'pose' ? 'pose' : null
-);
+let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
+
+$effect(() => {
+    if (session.type === 'accelerometer') {
+        // Default to 'webrtc' if not set, but allow switching
+        if (inputSource !== 'webrtc' && inputSource !== 'microbit') {
+            inputSource = 'webrtc';
+        }
+    } else if (session.type === 'pose') {
+        inputSource = 'pose';
+    }
+});
 
 // Recording state
 let isRecording: boolean = $state(false);
@@ -64,35 +71,11 @@ if (browser) {
     useMockMicroBit = params.get('mockmicrobit') === '1';
 }
 
-function loadRecordings(): Array<any> {
-    if (!recordingsStore) return [];
-    const raw = recordingsStore.get() || [];
-    return raw.map((rec: any) => {
-        if (rec.videoBlob && typeof rec.videoBlob === 'object' && rec.videoBlob.base64 && rec.videoBlob.type) {
-            return {
-                ...rec,
-                videoBlob: base64ToBlob(rec.videoBlob.base64, rec.videoBlob.type)
-            };
-        }
-        return rec;
-    });
-}
-async function saveRecordings() {
-    if (!recordingsStore) return;
-    const toStore = await Promise.all(recordings.map(async (rec) => {
-        if (rec.videoBlob instanceof Blob) {
-            const base64 = await blobToBase64(rec.videoBlob);
-            return { ...rec, videoBlob: { base64, type: rec.videoBlob.type } };
-        }
-        return rec;
-    }));
-    await recordingsStore.set(toStore);
-}
-
 // PeerJS connection handlers
 function handleIdChange(id: string) {
     otherId = id;
 }
+
 function handleConnect() {
     if (peer && otherId) {
         const conn = peer.connect(otherId);
@@ -160,13 +143,17 @@ async function handleRecordingStop(endTime: number, videoBlob: Blob) {
     await saveSession(session);
     recordingSensorData = [];
 }
-function handleDeleteRecording(id: string) {
+
+async function handleDeleteRecording(id: string) {
     recordings = recordings.filter(r => r.id !== id);
-    saveRecordings();
+    session.recordings = recordings;
+    await saveSession(session);
 }
+
 function handlePlayRecording(recording: any) {
     selectedRecording = recording;
 }
+
 function handleClosePlayback() {
     selectedRecording = null;
     recordings = [...recordings];
