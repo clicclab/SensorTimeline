@@ -59,8 +59,6 @@ let recordings: Recording[] = $state(session.recordings);
 let selectedRecording: any = $state(null);
 let savedSelections: Array<LabeledRecording> = $state([]);
 
-$inspect(savedSelections);
-
 // On mount: Check for ?mockmicrobit=1 in the URL
 if (browser) {
     // Check for ?mockmicrobit=1 in the URL
