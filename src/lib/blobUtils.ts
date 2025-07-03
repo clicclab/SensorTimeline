@@ -11,7 +11,7 @@ export function base64ToBlob(base64: string, mimeType: string): Blob {
     return new Blob([ab], { type: mimeType });
 }
 
-export async function blobToBase64(blob: Blob): Promise<string> {
+export function blobToBase64(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
