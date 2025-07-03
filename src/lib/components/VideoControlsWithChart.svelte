@@ -40,6 +40,7 @@
 
     let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
 
+    // This async is fine, do not change it to a regular $effect
     $effect(async () => {
         savedSelections;
 

@@ -4,6 +4,7 @@
     import type { AccelerometerDataPoint, PoseDataPoint, Recording, RecordingType } from '$lib/types';
     import { formatTime } from "$lib/formatUtils";
     import { getRecordingType } from "$lib/types";
+    import { getGlobalPoseDetector, cleanupGlobalDetector, convertToPixelCoordinates } from '$lib/mediapipe';
 
     type Props = {
         recording: Recording | null;
@@ -30,6 +31,13 @@
 
     // For pose: store flattened data for charting
     let flattenedPoseData: Array<{ x: number; y: number; z: number; timestamp: number }> = $state([]);
+
+    // Pose detection
+    let poseDetector: Awaited<ReturnType<typeof getGlobalPoseDetector>> | null = null;
+    let poseCanvas: HTMLCanvasElement | null = $state(null);
+    let poseReady = $state(false);
+    let poseError = $state('');
+    let poseDetectionFrame: number | null = null;
 
     // Sync sensor data with video playback
     function updateSensorData() {
@@ -110,6 +118,83 @@
         }
     });
 
+    async function setupPosePlaybackDetection() {
+        poseError = '';
+        poseReady = false;
+        try {
+            poseDetector = await getGlobalPoseDetector();
+            poseReady = true;
+            if (recordingType === 'pose' && poseReady && videoElement) {
+                startPosePlaybackDetectionLoop();
+            }
+        } catch (e) {
+            poseError = e instanceof Error ? e.message : 'Failed to load pose detection';
+            poseReady = false;
+        }
+    }
+
+    function startPosePlaybackDetectionLoop() {
+        if (recordingType !== 'pose' || !poseReady || !videoElement || !poseDetector) return;
+        const detect = () => {
+            if (recordingType !== 'pose' || !poseReady || !videoElement || !poseDetector) return;
+            if (videoElement.readyState >= 2 && !videoElement.paused && !videoElement.ended) {
+                const landmarks = poseDetector.detectPose(videoElement);
+                if (landmarks && landmarks.length > 0) {
+                    drawPosePlaybackLandmarks(landmarks);
+                } else if (poseCanvas) {
+                    const ctx = poseCanvas.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+                }
+            }
+            poseDetectionFrame = requestAnimationFrame(detect);
+        };
+        poseDetectionFrame = requestAnimationFrame(detect);
+    }
+
+    function stopPosePlaybackDetectionLoop() {
+        if (poseDetectionFrame !== null) {
+            cancelAnimationFrame(poseDetectionFrame);
+            poseDetectionFrame = null;
+        }
+        if (poseCanvas) {
+            const ctx = poseCanvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+        }
+    }
+
+    function drawPosePlaybackLandmarks(landmarks: any[]) {
+        if (!poseCanvas || !videoElement) return;
+        const ctx = poseCanvas.getContext('2d');
+        if (!ctx) return;
+        // Ensure canvas matches video display size for correct scaling
+        const videoRect = videoElement.getBoundingClientRect();
+        poseCanvas.width = videoRect.width;
+        poseCanvas.height = videoRect.height;
+        ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+        const pixelLandmarks = convertToPixelCoordinates(landmarks, videoElement);
+        pixelLandmarks.forEach(({ x, y }) => {
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00FF00';
+            ctx.fill();
+        });
+        ctx.restore();
+    }
+
+    $effect(() => {
+        if (recordingType === 'pose' && videoReady && !poseReady) {
+            setupPosePlaybackDetection();
+        }
+    });
+
+    $effect(() => {
+        if (recordingType === 'pose' && poseReady && videoReady && videoElement) {
+            startPosePlaybackDetectionLoop();
+        } else {
+            stopPosePlaybackDetectionLoop();
+        }
+    });
+
     onMount(() => {
         // Update sensor data every 50ms during playback
         playbackInterval = setInterval(() => {
@@ -126,6 +211,8 @@
         if (playbackInterval) {
             clearInterval(playbackInterval);
         }
+        stopPosePlaybackDetectionLoop();
+        cleanupGlobalDetector();
     });
 </script>
 
@@ -168,6 +255,14 @@
                             }
                         }}
                     ><track kind="captions" /></video>
+
+                    {#if recordingType === 'pose'}
+                        <canvas
+                            bind:this={poseCanvas}
+                            class="absolute inset-0 w-full aspect-video pointer-events-none"
+                            style="z-index:10;"
+                        ></canvas>
+                    {/if}
 
                     {#if videoReady}
                         <!-- Video Controls with Chart -->
