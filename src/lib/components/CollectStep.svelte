@@ -276,6 +276,7 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
         recording={selectedRecording}
         onClose={handleClosePlayback}
         {savedSelections}
+        sessionClasses={session.classes}
     />
     {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
         <div class="bg-gray-50 rounded-xl p-6">

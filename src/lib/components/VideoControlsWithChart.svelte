@@ -20,6 +20,7 @@
         minSelectionLength?: number; // ms
         maxSelectionLength?: number; // ms
         savedSelections: Array<{ t0: number; t1: number; label: string }>;
+        classLabels?: string[]; // Available class labels for selection
     };
     
     let {
@@ -34,6 +35,7 @@
         minSelectionLength,
         maxSelectionLength,
         savedSelections = $bindable([]),
+        classLabels = ['class A', 'class B'], // Default fallback
     }: Props = $props();
 
     let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
@@ -201,8 +203,14 @@
     }
 
     // Saved selections
-    let saveClass: string = $state('class A');
-    const classOptions = ['class A', 'class B'];
+    let saveClass: string = $state(classLabels[0] || 'class A');
+    
+    // Update saveClass when classLabels change
+    $effect(() => {
+        if (classLabels.length > 0 && !classLabels.includes(saveClass)) {
+            saveClass = classLabels[0];
+        }
+    });
 
     function saveSelection() {
         const sel = getSelectionTimestamps();
@@ -324,7 +332,7 @@
         <div style="margin-top:0.5em;">
             <label for="class-select" style="margin-right:0.5em;">Class:</label>
             <select id="class-select" bind:value={saveClass} style="font-size:0.95em;">
-                {#each classOptions as opt}
+                {#each classLabels as opt}
                     <option value={opt}>{opt}</option>
                 {/each}
             </select>
@@ -347,10 +355,10 @@
 {#if savedSelections.length > 0}
     <div style="margin-top:2em;">
         <b>Saved selections by class:</b>
-        {#each classOptions as className}
+        {#each classLabels as className}
             {#if savedSelections.filter(s => s.label === className).length > 0}
                 <div style="margin-top:1em;">
-                    <div style="font-weight:bold; color:{className === 'class A' ? '#3b82f6' : '#10b981'};">{className}</div>
+                    <div style="font-weight:bold; color:{className === classLabels[0] ? '#3b82f6' : '#10b981'};">{className}</div>
                     <ul style="margin:0.5em 0 0 0.5em; padding:0; list-style:disc inside;">
                         {#each savedSelections.filter(s => s.label === className) as sel, i}
                             <li style="margin-bottom:0.2em;">

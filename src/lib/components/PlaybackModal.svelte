@@ -9,9 +9,10 @@
         recording: Recording | null;
         onClose?: () => void;
         savedSelections?: Array<{t0: number, t1: number, label: string}>;
+        sessionClasses?: string[]; // Class labels from the active session
     };
 
-    let { recording, onClose = () => {}, savedSelections = $bindable([]) }: Props = $props();
+    let { recording, onClose = () => {}, savedSelections = $bindable([]), sessionClasses = ['Class 1', 'Class 2'] }: Props = $props();
 
     let videoElement: HTMLVideoElement | null = $state(null);
     let isPlaying = $state(false);
@@ -180,6 +181,7 @@
                             sensorData={recordingType === 'pose' ? flattenedPoseData : (recording.sensorData as AccelerometerDataPoint[])}
                             recordingStartTime={recording.startTime}
                             {savedSelections}
+                            classLabels={sessionClasses}
                         />
                     {:else}
                         <div class="flex items-center justify-center h-32"><span>Loading video metadata…</span></div>
