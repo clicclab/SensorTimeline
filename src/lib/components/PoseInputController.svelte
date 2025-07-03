@@ -1,41 +1,40 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { type Point } from "$lib/poseLandmarks";
 
-type Point = 'nose' | 'leftEye' | 'rightEye' | 'leftWrist' | 'rightWrist' | 'leftAnkle' | 'rightAnkle';
+    type Props = {
+        selectedPoints?: Point[];
+        onPointsChange?: (points: Point[]) => void;
+    };
 
-type Props = {
-    selectedPoints?: Point[];
-    onPointsChange?: (points: Point[]) => void;
-};
+    const allPoints: Point[] = [
+        'nose',
+        'leftEye',
+        'rightEye',
+        'leftWrist',
+        'rightWrist',
+        'leftAnkle',
+        'rightAnkle'
+    ];
 
-export const allPoints: Point[] = [
-    'nose',
-    'leftEye',
-    'rightEye',
-    'leftWrist',
-    'rightWrist',
-    'leftAnkle',
-    'rightAnkle'
-];
+    let { selectedPoints = [...allPoints], onPointsChange }: Props = $props();
 
-let { selectedPoints = [...allPoints], onPointsChange }: Props = $props();
-
-function togglePoint(point: Point) {
-    let updated: Point[];
-    if (selectedPoints.includes(point)) {
-        updated = selectedPoints.filter(p => p !== point);
-    } else {
-        updated = [...selectedPoints, point];
+    function togglePoint(point: Point) {
+        let updated: Point[];
+        if (selectedPoints.includes(point)) {
+            updated = selectedPoints.filter(p => p !== point);
+        } else {
+            updated = [...selectedPoints, point];
+        }
+        if (onPointsChange) onPointsChange(updated);
+        selectedPoints = updated;
     }
-    if (onPointsChange) onPointsChange(updated);
-    selectedPoints = updated;
-}
 
-onMount(() => {
-    // Ensure selectedPoints is always a valid subset of allPoints
-    selectedPoints = selectedPoints.filter(p => allPoints.includes(p));
-    onPointsChange?.(selectedPoints);
-});
+    onMount(() => {
+        // Ensure selectedPoints is always a valid subset of allPoints
+        selectedPoints = selectedPoints.filter(p => allPoints.includes(p));
+        onPointsChange?.(selectedPoints);
+    });
 </script>
 
 <div class="bg-white rounded-xl p-8 shadow-sm border border-gray-200 flex flex-col items-center text-center">
