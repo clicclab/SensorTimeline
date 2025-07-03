@@ -1,6 +1,7 @@
 // MediaPipe pose detection utilities for real-time video analysis
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import type { Vector3 } from './types';
+import { landmarkMap } from './poseLandmarks';
 
 export class MediaPipePoseDetector {
     private poseLandmarker: PoseLandmarker | null = null;
@@ -16,7 +17,7 @@ export class MediaPipePoseDetector {
             
             this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+                    modelAssetPath: "https://samankittani.github.io/mediapipe_models/models/pose_landmarker_full.task",
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
@@ -85,6 +86,29 @@ export function convertToPixelCoordinates(
 }
 
 /**
+ * Normalize a world-space skeleton so the midpoint between left and right hips is at the origin.
+ * Returns a new array of Vector3 with the same order as input.
+ * If hip landmarks are missing, returns the original array.
+ */
+export function normalizeSkeletonToHipCenter(landmarks: Vector3[]): Vector3[] {
+    const leftHipIdx = landmarkMap.leftHip;
+    const rightHipIdx = landmarkMap.rightHip;
+    const leftHip = landmarks[leftHipIdx];
+    const rightHip = landmarks[rightHipIdx];
+    if (!leftHip || !rightHip) return landmarks;
+    const center = {
+        x: (leftHip.x + rightHip.x) / 2,
+        y: (leftHip.y + rightHip.y) / 2,
+        z: (leftHip.z + rightHip.z) / 2
+    };
+    return landmarks.map(lm => ({
+        x: lm.x - center.x,
+        y: lm.y - center.y,
+        z: lm.z - center.z
+    }));
+}
+
+/**
  * Create a reusable MediaPipe detector instance
  */
 let globalDetector: MediaPipePoseDetector | null = null;
@@ -103,3 +127,4 @@ export function cleanupGlobalDetector(): void {
         globalDetector = null;
     }
 }
+

@@ -57,6 +57,8 @@
     // Prediction state
     let predictedLabel: string | null = $state(null);
 
+    let showMds: boolean = $state(false);
+
     $inspect(model);
 
     function handleIdChange(id: string) {
@@ -287,24 +289,41 @@
     </div>
     {#if model && mdsPoints.length >= 2}
       <div class="mb-6 relative">
-        <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
-        <MdsPlot
-          points={mdsPoints}
-          labels={mdsLabels}
-          colors={mdsColors}
-          distance={dtwDistance}
-          width={400}
-          height={320}
-          padding={32}
-        />
-        <div class="flex flex-wrap gap-4 mt-4 justify-center">
-          {#each Array.from(new Set(mdsLabels)) as label}
-            <div class="flex items-center gap-2 text-sm">
-              <span class="inline-block w-4 h-4 rounded-full" style={`background:${mdsColors[label]}`}></span>
-              <span>{label}</span>
+
+        {#if showMds}
+            <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
+            <MdsPlot
+            points={mdsPoints}
+            labels={mdsLabels}
+            colors={mdsColors}
+            distance={dtwDistance}
+            width={400}
+            height={320}
+            padding={32}
+            />
+            <div class="flex flex-wrap gap-4 mt-4 justify-center">
+            {#each Array.from(new Set(mdsLabels)) as label}
+                <div class="flex items-center gap-2 text-sm">
+                <span class="inline-block w-4 h-4 rounded-full" style={`background:${mdsColors[label]}`}></span>
+                <span>{label}</span>
+                </div>
+            {/each}
             </div>
-          {/each}
-        </div>
+            <button
+                class="absolute top-0 right-0 mt-2 mr-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm"
+                onclick={() => (showMds = false)}
+            >
+                Hide MDS Plot
+            </button>
+        {:else}
+            <button
+                class="absolute top-0 right-0 mt-2 mr-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm"
+                onclick={() => (showMds = true)}
+            >
+                Show MDS Plot
+            </button>
+        {/if}
+
       </div>
     {/if}
   {:else}

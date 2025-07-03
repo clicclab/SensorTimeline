@@ -83,9 +83,7 @@
                 }
             };
 
-            // Patch: call onRecordingStop with pose data if enabled
             if (mediaRecorder) {
-                const origOnStop = mediaRecorder.onstop;
                 mediaRecorder.onstop = (event: Event) => {
                     const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
                     const endTime = Date.now();

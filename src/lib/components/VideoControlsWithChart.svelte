@@ -1,7 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import SelectionChart from "$lib/components/SelectionChart.svelte";
+    import PoseSkeletonMini from "$lib/components/PoseSkeletonMini.svelte";
     import { LocalStore } from "$lib/localStore";
+    import type { PoseDataPoint } from '$lib/types';
+    import { normalizeSkeletonToHipCenter } from '$lib/mediapipe';
 
     type Props = {
         isPlaying: boolean;
@@ -21,6 +24,7 @@
         maxSelectionLength?: number; // ms
         savedSelections: Array<{ t0: number; t1: number; label: string }>;
         classLabels?: string[]; // Available class labels for selection
+        poseData?: PoseDataPoint[]; // Raw pose data for skeleton display
     };
     
     let {
@@ -36,6 +40,7 @@
         maxSelectionLength,
         savedSelections = $bindable([]),
         classLabels = ['class A', 'class B'], // Default fallback
+        poseData = [],
     }: Props = $props();
 
     let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
@@ -224,6 +229,41 @@
         selectEnd = null;
         hasSelection = false;
     }
+
+    // Compute skeleton positions for pose mode
+    let skeletonPositions = $derived(() => {
+        if (!poseData || poseData.length === 0) return [];
+        
+        // Sample skeletons every ~500ms for display
+        const sampleInterval = 500; // ms
+        const skeletons = [];
+        
+        for (let t = 0; t < duration; t += sampleInterval) {
+            const targetTime = recordingStartTime + t;
+            // Find closest pose data point
+            let closest = null;
+            let minDiff = Infinity;
+            
+            for (const pose of poseData) {
+                const diff = Math.abs(pose.timestamp - targetTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = pose;
+                }
+            }
+            
+            if (closest && minDiff < sampleInterval / 2) {
+                // Normalize skeleton to hip center for consistent display
+                const normalized = normalizeSkeletonToHipCenter(closest.landmarks);
+                skeletons.push({
+                    x: (t / duration) * actualWidth,
+                    landmarks: normalized
+                });
+            }
+        }
+        
+        return skeletons;
+    });
 </script>
 
 <div class="flex items-center space-x-3">
@@ -317,6 +357,28 @@
                     stroke="#ef4444"
                     stroke-width="2"
                 />
+                
+                <!-- Pose skeletons overlay -->
+                {#if poseData && poseData.length > 0}
+                    {#each skeletonPositions() as skeleton}
+                        <foreignObject 
+                            x={skeleton.x - 15} 
+                            y={height - 35} 
+                            width="30" 
+                            height="30"
+                            style="pointer-events: none;"
+                        >
+                            <PoseSkeletonMini 
+                                landmarks={skeleton.landmarks} 
+                                width={30} 
+                                height={30} 
+                                color="#666" 
+                                pointRadius={1}
+                                strokeWidth={1}
+                            />
+                        </foreignObject>
+                    {/each}
+                {/if}
             </g>
         </svg>
     </div>
