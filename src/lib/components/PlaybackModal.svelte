@@ -101,6 +101,19 @@
         if (!videoElement) return;
         videoElement.currentTime = seconds;
         updateSensorData();
+        // If in pose mode and pose overlay is active, force a pose detection on the new frame
+        if (recordingType === 'pose' && poseReady && poseDetector && poseCanvas) {
+            // Wait for the video to seek and render the new frame
+            requestAnimationFrame(() => {
+                const landmarks = poseDetector.detectPose(videoElement);
+                if (landmarks && landmarks.length > 0) {
+                    drawPosePlaybackLandmarks(landmarks);
+                } else {
+                    const ctx = poseCanvas.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+                }
+            });
+        }
     }
 
     // Setup video URL when recording changes (Svelte 5 style)
