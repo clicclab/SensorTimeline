@@ -1,10 +1,11 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import { DrawingUtils, FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
+    import type { PoseDataPoint, Vector3 } from '$lib/types';
 
     type Props = {
         onRecordingStart?: (startTime: number) => void;
-        onRecordingStop?: (endTime: number, videoBlob: Blob) => void;
+        onRecordingStop?: (endTime: number, videoBlob: Blob, poseData?: PoseDataPoint[]) => void;
         onRecordingData?: (timestamp: number) => void;
         allowRecording?: boolean;
         enablePoseDetection?: boolean;
@@ -30,6 +31,7 @@
     let poseRunner: PoseLandmarker | null = null;
     let poseReady = $state(false);
     let poseError = $state('');
+    let poseRecordingData: PoseDataPoint[] = $state([]);
 
     // Request webcam access
     async function requestWebcamAccess() {
@@ -66,6 +68,8 @@
             if (!stream) return;
         }
 
+        poseRecordingData = []; // Reset pose data for new recording
+
         try {
             recordedChunks = [];
             mediaRecorder = new MediaRecorder(stream, {
@@ -78,17 +82,24 @@
                 }
             };
 
-            mediaRecorder.onstop = () => {
-                const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
-                const endTime = Date.now();
-                onRecordingStop?.(endTime, videoBlob);
-                
-                // Stop duration tracking
-                if (durationInterval) {
-                    clearInterval(durationInterval);
-                    durationInterval = null;
-                }
-            };
+            // Patch: call onRecordingStop with pose data if enabled
+            if (mediaRecorder) {
+                const origOnStop = mediaRecorder.onstop;
+                mediaRecorder.onstop = (event: Event) => {
+                    const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const endTime = Date.now();
+                    if (enablePoseDetection) {
+                        onRecordingStop?.(endTime, videoBlob, poseRecordingData);
+                    } else {
+                        onRecordingStop?.(endTime, videoBlob);
+                    }
+                    // Stop duration tracking
+                    if (durationInterval) {
+                        clearInterval(durationInterval);
+                        durationInterval = null;
+                    }
+                };
+            }
 
             mediaRecorder.start(100); // Record in 100ms chunks
             isRecording = true;
@@ -179,6 +190,13 @@
             if (videoElement.readyState >= 2) {
                 const result = await poseRunner.detectForVideo(videoElement, performance.now());
                 if (result && result.landmarks && result.landmarks.length > 0) {
+                    if(isRecording){
+                        poseRecordingData.push({
+                            timestamp: performance.now(),
+                            landmarks: result.worldLandmarks[0] as Vector3[]
+                        });
+                    }
+
                     drawPoseLandmarks(result.landmarks[0]);
                 } else if (poseCanvas) {
                     const ctx = poseCanvas.getContext('2d');

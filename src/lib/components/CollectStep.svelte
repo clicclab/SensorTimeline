@@ -88,6 +88,7 @@ function handleConnect() {
         });
     }
 }
+
 function handleDisconnect() {
     clearDataHistory();
     if (connection) {
@@ -95,6 +96,7 @@ function handleDisconnect() {
         connection = null;
     }
 }
+
 function handleIncomingData(rawData: any) {
     try {
         const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
@@ -110,6 +112,7 @@ function handleIncomingData(rawData: any) {
         // Optionally handle error
     }
 }
+
 function clearDataHistory() {
     dataHistory = [];
     accelerometerData = null;
@@ -123,14 +126,14 @@ function handleRecordingStart(startTime: number) {
     recordingSensorData = [];
 }
 
-async function handleRecordingStop(endTime: number, videoBlob: Blob) {
+async function handleRecordingStop(endTime: number, videoBlob: Blob, poseData?: any[]) {
     isRecording = false;
     const newRecording = {
         id: `recording-${Date.now()}`,
         startTime: recordingStartTime,
         endTime: endTime,
         videoBlob: videoBlob,
-        sensorData: [...recordingSensorData],
+        sensorData: session.type === 'pose' && poseData ? [...poseData] : [...recordingSensorData],
         duration: endTime - recordingStartTime
     };
     recordings = [...recordings, newRecording];
