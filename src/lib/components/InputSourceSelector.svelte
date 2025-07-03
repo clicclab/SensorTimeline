@@ -47,7 +47,7 @@
 				</div>
 			</div>
 		</label>
-		<label class="relative h-full flex">
+		<!-- <label class="relative h-full flex">
 			<input
 				type="radio"
 				checked={inputSource === 'pose'}
@@ -65,6 +65,6 @@
 					</div>
 				</div>
 			</div>
-		</label>
+		</label> -->
 	</div>
 </div>

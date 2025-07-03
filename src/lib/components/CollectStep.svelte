@@ -15,12 +15,14 @@ import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
 import { base64ToBlob, blobToBase64 } from "$lib/blobUtils";
 import type { AccelerometerDataPoint, Recording } from "$lib/types";
+    import { saveSession } from "$lib/session";
 
 // Props
  type Props = {
     stepForward: () => void;
+    session: import('$lib/session').Session;
 };
-let { stepForward }: Props = $props();
+let { stepForward, session }: Props = $props();
 
 // PeerJS state
 let peer: Peer | null = $state.raw(null);
@@ -39,7 +41,9 @@ let isMicroBitConnected: boolean = $state(false);
 let useMockMicroBit = $state(false);
 
 // Input source
-let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
+let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $derived(
+    session.type === 'accelerometer' ? 'webrtc' : session.type === 'pose' ? 'pose' : null
+);
 
 // Recording state
 let isRecording: boolean = $state(false);
@@ -47,19 +51,14 @@ let recordingStartTime: number = 0;
 let recordingSensorData: Array<AccelerometerDataPoint> = [];
 
 // Recordings store
-let recordingsStore: LocalStore<any> | null = $state.raw(null);
-let recordings: Recording[] = $state([]);
+let recordings: Recording[] = $state(session.recordings);
 
 // Playback modal state
 let selectedRecording: any = $state(null);
 let savedSelections: Array<{t0: number, t1: number, label: string}> = $state([]);
 
-// On mount: initialize recordings store and load
+// On mount: Check for ?mockmicrobit=1 in the URL
 if (browser) {
-    LocalStore.create<Array<Recording>>("saved-recordings", []).then(store => {
-        recordingsStore = store;
-        recordings = loadRecordings();
-    });
     // Check for ?mockmicrobit=1 in the URL
     const params = new URLSearchParams(window.location.search);
     useMockMicroBit = params.get('mockmicrobit') === '1';
@@ -145,7 +144,8 @@ function handleRecordingStart(startTime: number) {
     recordingStartTime = startTime;
     recordingSensorData = [];
 }
-function handleRecordingStop(endTime: number, videoBlob: Blob) {
+
+async function handleRecordingStop(endTime: number, videoBlob: Blob) {
     isRecording = false;
     const newRecording = {
         id: `recording-${Date.now()}`,
@@ -156,8 +156,9 @@ function handleRecordingStop(endTime: number, videoBlob: Blob) {
         duration: endTime - recordingStartTime
     };
     recordings = [...recordings, newRecording];
+    session.recordings = recordings;
+    await saveSession(session);
     recordingSensorData = [];
-    saveRecordings();
 }
 function handleDeleteRecording(id: string) {
     recordings = recordings.filter(r => r.id !== id);
@@ -237,11 +238,13 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
 
 </script>
 
-<InputSourceSelector
-    {inputSource}
-    onChange={(val) => (inputSource = val)}
-/>
 <div class="space-y-6">
+    {#if session.type === 'accelerometer'}
+      <InputSourceSelector
+        {inputSource}
+        onChange={(val) => (inputSource = val)}
+      />
+    {/if}
     {#if inputSource === 'webrtc'}
         <div class="mb-8 p-6 bg-gray-50 rounded-xl">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
