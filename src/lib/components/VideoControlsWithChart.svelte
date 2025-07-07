@@ -5,7 +5,7 @@
     import { LocalStore } from "$lib/localStore";
     import type { AccelerometerDataPoint, PoseDataPoint } from '$lib/types';
     import { normalizeSkeletonToHipCenter } from '$lib/mediapipe';
-    import { get } from "svelte/store";
+    import { getSkeletonPositions } from "$lib/getSkeletonPositions";
 
     type Props = {
         isPlaying: boolean;
@@ -249,52 +249,24 @@
         hasSelection = false;
     }
 
-    // Compute skeleton positions for pose mode
-    let getSkeletonPositions = () => {
-        if (!poseData || poseData.length === 0) {
-            console.warn('No pose data available for skeleton positions');
-            return [];
-        }
-
-        // Sample skeletons every ~500ms for display
-        const sampleInterval = duration / 15; // ms
-        const skeletons = [];
-
-        const dataStartTime = poseData[0].timestamp || recordingStartTime;
-        
-        for (let t = 0; t < duration; t += sampleInterval) {
-            const targetTime = dataStartTime + t;
-            // Find closest pose data point
-            let closest = null;
-            let minDiff = Infinity;
-            
-            for (const pose of poseData) {
-                const diff = Math.abs(pose.timestamp - targetTime);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closest = pose;
-                }
-            }
-            
-            if (closest && minDiff < sampleInterval / 2) {
-                // Normalize skeleton to hip center for consistent display
-                const normalized = normalizeSkeletonToHipCenter(closest.landmarks);
-                skeletons.push({
-                    x: (t / duration) * actualWidth,
-                    landmarks: normalized
-                });
-            }
-        }
-        console.log('Skeleton positions:', skeletons); // Debug log
-        return skeletons;
-    };
-
-    let skeletonPositions = $state(getSkeletonPositions());
+    let skeletonPositions = $state(getSkeletonPositions({
+        poseData,
+        duration,
+        recordingStartTime,
+        actualWidth,
+        sampleInterval: duration / 15 // Sample every 15th of the duration
+    }));
 
     $effect(() => {
         poseData;
-        
-        skeletonPositions = getSkeletonPositions();
+
+        skeletonPositions = getSkeletonPositions({
+            poseData,
+            duration,
+            recordingStartTime,
+            actualWidth,
+            sampleInterval: duration / 15
+        });
     });
 
     $inspect(skeletonPositions);
