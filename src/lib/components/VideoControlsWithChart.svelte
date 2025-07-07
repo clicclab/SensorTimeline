@@ -5,6 +5,7 @@
     import { LocalStore } from "$lib/localStore";
     import type { AccelerometerDataPoint, PoseDataPoint } from '$lib/types';
     import { normalizeSkeletonToHipCenter } from '$lib/mediapipe';
+    import { get } from "svelte/store";
 
     type Props = {
         isPlaying: boolean;
@@ -13,13 +14,12 @@
         formatTime: (s: number) => string;
         onToggle: () => void;
         onSeek: (s: number) => void;
-        sensorData: Array<AccelerometerDataPoint | PoseDataPoint>;
+        sensorData: AccelerometerDataPoint[] | PoseDataPoint[];
         recordingStartTime: number;
         minSelectionLength?: number; // ms
         maxSelectionLength?: number; // ms
         savedSelections: Array<{ t0: number; t1: number; label: string }>;
         classLabels?: string[]; // Available class labels for selection
-        poseData?: PoseDataPoint[]; // Raw pose data for skeleton display
     };
     
     let {
@@ -35,7 +35,6 @@
         maxSelectionLength,
         savedSelections = $bindable([]),
         classLabels = ['class A', 'class B'], // Default fallback
-        poseData = [],
     }: Props = $props();
 
     let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
@@ -81,11 +80,21 @@
         }
     });
 
+    let recordingType: 'accelerometer' | 'pose' | null = $state(null);
+
+    if (sensorData.length > 0) {
+        if ('x' in sensorData[0] && 'y' in sensorData[0] && 'z' in sensorData[0]) {
+            recordingType = 'accelerometer';
+        } else if ('landmarks' in sensorData[0]) {
+            recordingType = 'pose';
+        }
+    }
+    
     // Compute chart points, scale t to actualWidth
     let points = $derived(
         (sensorData.length === 0 || sensorData[0].timestamp === undefined || 
         sensorData[0].x === undefined || sensorData[0].y === undefined || sensorData[0].z === undefined) ? [] :
-        sensorData.map((d) => ({
+        (sensorData as AccelerometerDataPoint[]).map((d) => ({
             t: ((d.timestamp - recordingStartTime) / duration) * actualWidth,
             x: d.x,
             y: d.y,
@@ -93,20 +102,31 @@
         })),
     );
 
+    let poseData = $derived(
+        (sensorData.length === 0 || !('landmarks' in sensorData[0])) ? [] :
+        (sensorData as PoseDataPoint[]).map((d) => ({
+            timestamp: d.timestamp,
+            landmarks: d.landmarks,
+            videoLandmarks: d.videoLandmarks,
+        })),
+    );
+
     // Find min/max for scaling
     let minVal = $derived(
         (sensorData.length === 0 || sensorData[0].x === undefined) ? 0 :
-        Math.min(...sensorData.map((d) => Math.min(d.x, d.y, d.z)), 0),
+        Math.min(...(sensorData as AccelerometerDataPoint[]).map((d) => Math.min(d.x, d.y, d.z)), 0),
     );
     let maxVal = $derived(
         (sensorData.length === 0 || sensorData[0].x === undefined) ? 0 :
-        Math.max(...sensorData.map((d) => Math.max(d.x, d.y, d.z)), 0),
+        Math.max(...(sensorData as AccelerometerDataPoint[]).map((d) => Math.max(d.x, d.y, d.z)), 0),
     );
-    let range = $derived(maxVal - minVal || 1);
 
     // Scale function
-    function scaleY(val: number) {
-        return height - ((val - minVal) / range) * height;
+    function scaleY(val: number, min: number | null = null, max: number | null = null) {
+        min ??= minVal;
+        max ??= maxVal;
+        let range = max - min;
+        return height - ((val - min) / range) * height;
     }
 
     // Selection state (make reactive)
@@ -230,15 +250,20 @@
     }
 
     // Compute skeleton positions for pose mode
-    let skeletonPositions = $derived(() => {
-        if (!poseData || poseData.length === 0) return [];
-        
+    let getSkeletonPositions = () => {
+        if (!poseData || poseData.length === 0) {
+            console.warn('No pose data available for skeleton positions');
+            return [];
+        }
+
         // Sample skeletons every ~500ms for display
-        const sampleInterval = 500; // ms
+        const sampleInterval = duration / 15; // ms
         const skeletons = [];
+
+        const dataStartTime = poseData[0].timestamp || recordingStartTime;
         
         for (let t = 0; t < duration; t += sampleInterval) {
-            const targetTime = recordingStartTime + t;
+            const targetTime = dataStartTime + t;
             // Find closest pose data point
             let closest = null;
             let minDiff = Infinity;
@@ -260,9 +285,20 @@
                 });
             }
         }
-        
+        console.log('Skeleton positions:', skeletons); // Debug log
         return skeletons;
+    };
+
+    let skeletonPositions = $state(getSkeletonPositions());
+
+    $effect(() => {
+        poseData;
+        
+        skeletonPositions = getSkeletonPositions();
     });
+
+    $inspect(skeletonPositions);
+
 </script>
 
 <div class="flex items-center space-x-3">
@@ -326,27 +362,46 @@
                         />
                     {/key}
                 {/if}
-                <!-- X Line -->
-                <polyline
-                    fill="none"
-                    stroke="#3b82f6"
-                    stroke-width="2"
-                    points={points.map((p) => `${p.t},${scaleY(p.x)}`).join(" ")}
-                />
-                <!-- Y Line -->
-                <polyline
-                    fill="none"
-                    stroke="#10b981"
-                    stroke-width="2"
-                    points={points.map((p) => `${p.t},${scaleY(p.y)}`).join(" ")}
-                />
-                <!-- Z Line -->
-                <polyline
-                    fill="none"
-                    stroke="#a21caf"
-                    stroke-width="2"
-                    points={points.map((p) => `${p.t},${scaleY(p.z)}`).join(" ")}
-                />
+                {#if recordingType === 'accelerometer'}
+                    <!-- X Line -->
+                    <polyline
+                        fill="none"
+                        stroke="#3b82f6"
+                        stroke-width="2"
+                        points={points.map((p) => `${p.t},${scaleY(p.x)}`).join(" ")}
+                    />
+                    <!-- Y Line -->
+                    <polyline
+                        fill="none"
+                        stroke="#10b981"
+                        stroke-width="2"
+                        points={points.map((p) => `${p.t},${scaleY(p.y)}`).join(" ")}
+                    />
+                    <!-- Z Line -->
+                    <polyline
+                        fill="none"
+                        stroke="#a21caf"
+                        stroke-width="2"
+                        points={points.map((p) => `${p.t},${scaleY(p.z)}`).join(" ")}
+                    />
+                {:else if recordingType === 'pose'}
+                    <!-- Pose skeletons -->
+                    {#each skeletonPositions as skeleton}
+                        <foreignObject
+                            x={skeleton.x - 16}
+                            y={height / 2 - 16}
+                            width={32}
+                            height={32}
+                            style="pointer-events: none;"
+                        >
+                            <PoseSkeletonMini
+                                landmarks={skeleton.landmarks}
+                                width={32}
+                                height={32}
+                            />
+                        </foreignObject>
+                    {/each}
+                {/if}
                 <!-- Current time marker -->
                 <line
                     x1={(currentTime / duration) * actualWidth}
@@ -356,28 +411,6 @@
                     stroke="#ef4444"
                     stroke-width="2"
                 />
-                
-                <!-- Pose skeletons overlay -->
-                {#if poseData && poseData.length > 0}
-                    {#each skeletonPositions() as skeleton}
-                        <foreignObject 
-                            x={skeleton.x - 15} 
-                            y={height - 35} 
-                            width="30" 
-                            height="30"
-                            style="pointer-events: none;"
-                        >
-                            <PoseSkeletonMini 
-                                landmarks={skeleton.landmarks} 
-                                width={30} 
-                                height={30} 
-                                color="#666" 
-                                pointRadius={1}
-                                strokeWidth={1}
-                            />
-                        </foreignObject>
-                    {/each}
-                {/if}
             </g>
         </svg>
     </div>
