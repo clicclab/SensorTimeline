@@ -7,6 +7,7 @@
     import { modelStore } from "$lib/modelStore";
     import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types.js";
     import { normalizeSkeletonToHipCenter } from "$lib/mediapipe.js";
+    import { filterToUsedLandmarks } from "$lib/poseLandmarks.js";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -54,7 +55,8 @@
         return (points as PoseDataPoint[]).flatMap(d => {
           if ('landmarks' in d) {
             // Normalize landmarks to hip center
-            const normalized = normalizeSkeletonToHipCenter(d.landmarks);
+            let normalized = normalizeSkeletonToHipCenter(d.landmarks);
+            normalized = filterToUsedLandmarks(normalized);
             return normalized.map(p => [p.x, p.y, p.z]);
           }
           return [];
@@ -116,7 +118,7 @@
         trainLoss = [];
         // Prepare segments
         const segments = labeledSegments.map(({ label, data }) => ({ label, data }));
-        const result = await trainNNClassifier(segments, { epochs, learningRate, hiddenUnits });
+        const result = await trainNNClassifier(segments, { epochs, learningRate, hiddenUnits }, segments[0].data[0].length);
         nnModel = result.model;
         modelStore.set(nnModel); // Save model to store for use in test step
         trainLoss = result.loss;
@@ -143,7 +145,7 @@
         }
         // Compute predicted labels for each training point
         if (nnModel && labeledSegments.length > 0) {
-            predictedLabels = labeledSegments.map(seg => nnPredict(nnModel, flattenSegment(seg.data, 100)));
+            predictedLabels = labeledSegments.map(seg => nnPredict(nnModel, flattenSegment(seg.data, 100), seg.data[0].length));
         } else {
             predictedLabels = [];
         }

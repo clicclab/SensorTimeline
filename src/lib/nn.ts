@@ -40,14 +40,23 @@ export function createNNClassifierModel(
 // Placeholder: forward pass (single sample)
 export function nnPredict(
   model: NNClassifierModel,
-  input: number[]
+  input: number[],
+  inputFeatures: number = 3 // n: number of features per timestep
 ): string {
     if (!model.weights) {
         throw new Error("Model weights not initialized");
     }
 
-    // Convert input to tensor3d: [1, 100, 3]
-    const input3d = tf.tensor3d([Array.from({length: 100}, (_, i) => [input[i*3] || 0, input[i*3+1] || 0, input[i*3+2] || 0])]);
+    // Convert input to tensor3d: [1, 100, n]
+    const timesteps = 100;
+    const input3dArr = Array.from({length: timesteps}, (_, i) => {
+      const step: number[] = [];
+      for (let j = 0; j < inputFeatures; ++j) {
+        step.push(input[i*inputFeatures + j] || 0);
+      }
+      return step;
+    });
+    const input3d = tf.tensor3d([input3dArr]);
 
     // Forward pass through the model
     const outputTensor = model.weights.predict(input3d) as tf.Tensor;
@@ -63,7 +72,8 @@ export function nnPredict(
 // Placeholder: training (returns random weights, no real training)
 export async function trainNNClassifier(
   segments: Array<{ label: string; data: number[][] }>,
-  options: NNTrainOptions
+  options: NNTrainOptions,
+  inputs: number = 3, // Number of input features (e.g., 3 for x, y, z)
 ): Promise<NNTrainResult> {
     console.log("Training NN Classifier with options:", options);
     const { epochs, learningRate, hiddenUnits } = options;
@@ -74,7 +84,7 @@ export async function trainNNClassifier(
     model.add(tf.layers.simpleRNN({
         units: hiddenUnits,
         returnSequences: false,
-        inputShape: [100, 3], // Assuming each segment has 100 timesteps with 3 features (x, y, z)
+        inputShape: [100, inputs], // Assuming each segment has 100 timesteps with 3 features (x, y, z)
     }));
     model.add(tf.layers.dense({
         units: segments.length, // Output layer size matches number of labels
