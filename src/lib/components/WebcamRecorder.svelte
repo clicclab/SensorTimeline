@@ -186,7 +186,7 @@
                 if (landmarks && landmarks.landmarks.length > 0) {
                     if (isRecording) {
                         poseRecordingData.push({
-                            timestamp: performance.now(),
+                            timestamp: Date.now(),
                             landmarks: landmarks.landmarks,
                             videoLandmarks: landmarks.videoLandmarks,
                         });

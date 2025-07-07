@@ -1,12 +1,14 @@
 <script lang="ts">
-    import { LocalStore } from "$lib/localStore";
-    import { formatDuration } from "$lib/formatUtils";
-    import type { LabeledRecording, Recording } from "$lib/types";
-    import Sparkline from "./ui/Sparkline.svelte";
+	import { LocalStore } from "$lib/localStore";
+	import { formatDuration } from "$lib/formatUtils";
+	import type { AccelerometerDataPoint, LabeledRecording, PoseDataPoint, Recording } from "$lib/types";
+	import Sparkline from "./ui/Sparkline.svelte";
+import PoseSkeletonMini from "./PoseSkeletonMini.svelte";
+	import { normalizeSkeletonToHipCenter } from "$lib/mediapipe";
 
 type Props = {
 	recordings: Recording[];
-    labeledRecordings?: LabeledRecording[];
+	labeledRecordings?: LabeledRecording[];
 };
 
 let { recordings, labeledRecordings = $bindable([]) }: Props = $props();
@@ -30,6 +32,17 @@ async function loadLabeledRecordings() {
 	return all;
 }
 
+let recordingType: 'accelerometer' | 'pose' | null = $state(null);
+
+if (recordings.length > 0) {
+	if ('x' in recordings[0].sensorData[0] && 'y' in recordings[0].sensorData[0] && 'z' in recordings[0].sensorData[0]) {
+		recordingType = 'accelerometer';
+	} else if ('landmarks' in recordings[0].sensorData[0]) {
+		recordingType = 'pose';
+	}
+}
+
+// This async is necessary
 $effect(async () => {
 	recordings;
 	labeledRecordings = await loadLabeledRecordings();
@@ -43,7 +56,7 @@ const labeledRecordingsByClass = $derived(
 	}, {} as Record<string, LabeledRecording[]>)
 );
 
-function getLabeledSensorData(labeled: LabeledRecording, recordings: Recording[]) {
+function getLabeledSensorData(labeled: LabeledRecording, recordings: Recording[]): AccelerometerDataPoint[] | PoseDataPoint[] {
 	const parent = recordings.find(r => r.startTime === labeled.recordingStartTime);
 	if (!parent) return [];
 	const t0Abs = labeled.t0 < 1e12 ? labeled.recordingStartTime + labeled.t0 : labeled.t0;
@@ -62,7 +75,7 @@ function getLabeledSensorData(labeled: LabeledRecording, recordings: Recording[]
 	<div class="space-y-3">
 		{#each Object.entries(labeledRecordingsByClass) as [label, recordingsByLabel]}
 			<div class="font-medium text-gray-900 mb-2">{label} ({recordingsByLabel.length})</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+			<div class="grid grid-cols-1 {recordingType === 'accelerometer' ? 'sm:grid-cols-2 lg:grid-cols-3' : ''} gap-3">
 				{#each recordingsByLabel as recording}
 					<div class="border border-gray-200 rounded-lg p-3">
 						<div class="flex items-center justify-between mb-2">
@@ -77,7 +90,28 @@ function getLabeledSensorData(labeled: LabeledRecording, recordings: Recording[]
 									<div class="text-xs text-gray-500 flex items-center gap-2">
 										{formatDuration(recording.t1 - recording.t0)}
 										<span class="inline-block">
-											<Sparkline data={getLabeledSensorData(recording, recordings)} width={60} height={16} strokeWidth={2} />
+											{#if recordingType === 'accelerometer'}
+												<Sparkline data={getLabeledSensorData(recording, recordings)} width={60} height={16} strokeWidth={2} />
+											{:else if recordingType === 'pose'}
+												{#if getLabeledSensorData(recording, recordings).length > 0 && 'landmarks' in getLabeledSensorData(recording, recordings)[0]}
+													<div class="flex gap-3 items-center w-full overflow-hidden">
+														{#each Array.from({ length: 12 }) as _, i}
+															{#if getLabeledSensorData(recording, recordings)[Math.floor(i * (getLabeledSensorData(recording, recordings).length - 1) / 11)] as PoseDataPoint}
+																<PoseSkeletonMini
+																	landmarks={normalizeSkeletonToHipCenter((getLabeledSensorData(recording, recordings)[Math.floor(i * (getLabeledSensorData(recording, recordings).length - 1) / 11)] as PoseDataPoint).landmarks)}
+																	width={16}
+																	height={24}
+																	color="#f59e0b"
+																	pointRadius={0.8}
+																	strokeWidth={0.7}
+																/>
+															{/if}
+														{/each}
+													</div>
+												{:else}
+													<span class="text-gray-400">No pose</span>
+												{/if}
+											{/if}
 										</span>
 									</div>
 								</div>
