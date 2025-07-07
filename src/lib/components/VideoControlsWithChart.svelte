@@ -3,7 +3,7 @@
     import SelectionChart from "$lib/components/SelectionChart.svelte";
     import PoseSkeletonMini from "$lib/components/PoseSkeletonMini.svelte";
     import { LocalStore } from "$lib/localStore";
-    import type { PoseDataPoint } from '$lib/types';
+    import type { AccelerometerDataPoint, PoseDataPoint } from '$lib/types';
     import { normalizeSkeletonToHipCenter } from '$lib/mediapipe';
 
     type Props = {
@@ -13,12 +13,7 @@
         formatTime: (s: number) => string;
         onToggle: () => void;
         onSeek: (s: number) => void;
-        sensorData: Array<{
-            x: number;
-            y: number;
-            z: number;
-            timestamp: number;
-        }>;
+        sensorData: Array<AccelerometerDataPoint | PoseDataPoint>;
         recordingStartTime: number;
         minSelectionLength?: number; // ms
         maxSelectionLength?: number; // ms
@@ -88,6 +83,8 @@
 
     // Compute chart points, scale t to actualWidth
     let points = $derived(
+        (sensorData.length === 0 || sensorData[0].timestamp === undefined || 
+        sensorData[0].x === undefined || sensorData[0].y === undefined || sensorData[0].z === undefined) ? [] :
         sensorData.map((d) => ({
             t: ((d.timestamp - recordingStartTime) / duration) * actualWidth,
             x: d.x,
@@ -98,9 +95,11 @@
 
     // Find min/max for scaling
     let minVal = $derived(
+        (sensorData.length === 0 || sensorData[0].x === undefined) ? 0 :
         Math.min(...sensorData.map((d) => Math.min(d.x, d.y, d.z)), 0),
     );
     let maxVal = $derived(
+        (sensorData.length === 0 || sensorData[0].x === undefined) ? 0 :
         Math.max(...sensorData.map((d) => Math.max(d.x, d.y, d.z)), 0),
     );
     let range = $derived(maxVal - minVal || 1);

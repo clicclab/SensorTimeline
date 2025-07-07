@@ -4,6 +4,7 @@
     import type { AccelerometerDataPoint, PoseDataPoint, Recording, RecordingType } from '$lib/types';
     import { formatTime } from "$lib/formatUtils";
     import { getRecordingType } from "$lib/types";
+    import { drawPoseLandmarks } from '$lib/mediapipe';
 
     type Props = {
         recording: Recording | null;
@@ -22,14 +23,11 @@
     
     // Full sensor data and current position
     let currentSensorData: Array<AccelerometerDataPoint | PoseDataPoint> = $state([]);
-    let currentReading: AccelerometerDataPoint | PoseDataPoint | null = null;
+    let currentReading: AccelerometerDataPoint | PoseDataPoint | null = $state(null); // Current sensor reading at playback positio
     let currentTimelinePosition = $state(0); // Position in the timeline (0-1)
     let videoDuration = $state(0); // Duration in milliseconds
     let videoReady = $state(false); // Whether video metadata is ready
     let recordingType: RecordingType | null = $state(null);
-
-    // For pose: store flattened data for charting
-    let flattenedPoseData: Array<{ x: number; y: number; z: number; timestamp: number }> = $state([]);
 
     // Sync sensor data with video playback
     function updateSensorData() {
@@ -43,18 +41,12 @@
         }
 
         const videoCurrentTime = videoElement.currentTime * 1000; // ms
-        const absoluteTime = recording.startTime + videoCurrentTime;
+        const dataStartTime = recording.sensorData[0]?.timestamp || 0;
+        const absoluteTime = dataStartTime + videoCurrentTime;
         
         // Determine recording type and update sensor data accordingly
         recordingType = getRecordingType(recording);
         if (recordingType === 'pose') {
-            // Flatten all landmarks for each frame, use first landmark as x/y/z for chart
-            flattenedPoseData = (recording.sensorData as PoseDataPoint[]).map((d) => ({
-                x: d.landmarks[0]?.x ?? 0,
-                y: d.landmarks[0]?.y ?? 0,
-                z: d.landmarks[0]?.z ?? 0,
-                timestamp: d.timestamp
-            }));
             currentSensorData = recording.sensorData as PoseDataPoint[];
         } else {
             currentSensorData = recording.sensorData as AccelerometerDataPoint[];
@@ -77,7 +69,20 @@
         
         currentReading = closestReading;
         currentTime = videoCurrentTime;
+
+        if(recordingType === 'pose' && poseCanvas && videoElement) {
+            drawPoseLandmarks(poseCanvas, videoElement, (currentReading as PoseDataPoint).videoLandmarks.map(l => {
+                return {
+                    x: l.x,
+                    y: l.y,
+                    z: l.z,
+                    visibility: l.x >= 0 && l.x <= 1 && l.y >= 0 && l.y <= 1 ? 1 : 0
+                };
+            }));
+        }
     }
+
+    $inspect(currentReading);
 
     function togglePlayback() {
         if (!videoElement) return;
@@ -127,6 +132,9 @@
             clearInterval(playbackInterval);
         }
     });
+
+    let poseCanvas: HTMLCanvasElement | null = $state(null);
+
 </script>
 
 {#if recording}
@@ -168,6 +176,15 @@
                             }
                         }}
                     ><track kind="captions" /></video>
+                    
+                    {#if recordingType === 'pose'}
+                        <!-- Pose Landmarks Canvas -->
+                        <canvas 
+                            class="pointer-events-none w-full aspect-video bg-transparent"
+                            bind:this={poseCanvas}
+                            style="position: absolute; inset: 0; z-index: 10;"
+                        ></canvas>
+                    {/if}
 
                     {#if videoReady}
                         <!-- Video Controls with Chart -->
@@ -178,11 +195,12 @@
                             formatTime={formatTime}
                             onToggle={togglePlayback}
                             onSeek={seekTo}
-                            sensorData={recordingType === 'pose' ? flattenedPoseData : (recording.sensorData as AccelerometerDataPoint[])}
+                            sensorData={recording.sensorData}
                             recordingStartTime={recording.startTime}
                             {savedSelections}
                             classLabels={sessionClasses}
                         />
+
                     {:else}
                         <div class="flex items-center justify-center h-32"><span>Loading video metadata…</span></div>
                     {/if}

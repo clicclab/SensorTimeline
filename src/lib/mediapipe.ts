@@ -1,5 +1,5 @@
 // MediaPipe pose detection utilities for real-time video analysis
-import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { PoseLandmarker, FilesetResolver, DrawingUtils, type NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { Vector3 } from './types';
 import { landmarkMap } from './poseLandmarks';
 
@@ -135,3 +135,30 @@ export function cleanupGlobalDetector(): void {
     }
 }
 
+export function drawPoseLandmarks(poseCanvas: HTMLCanvasElement, videoElement: HTMLVideoElement, landmarks: NormalizedLandmark[]) {
+        if (!poseCanvas || !videoElement) return;
+        const ctx = poseCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+
+        // Ensure canvas matches video display size for correct scaling
+        const videoRect = videoElement.getBoundingClientRect();
+        poseCanvas.width = videoRect.width;
+        poseCanvas.height = videoRect.height;
+
+        // Use DrawingUtils from @mediapipe/tasks-vision to draw skeleton
+        const drawingUtils = new DrawingUtils(ctx);
+        // DrawingUtils expects landmarks in normalized coordinates (0-1)
+        // and draws on the canvas sized to the video
+        drawingUtils.drawLandmarks(landmarks, {
+            color: '#00FF00',
+            radius: 2,
+        });
+
+        drawingUtils.drawConnectors(landmarks, 
+            PoseLandmarker.POSE_CONNECTIONS,    
+        {
+            lineWidth: 2,
+            color: '#00BF22',
+        });
+    }

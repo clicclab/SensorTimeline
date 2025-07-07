@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import { DrawingUtils, PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision';
     import type { PoseDataPoint, Vector3 } from '$lib/types';
-    import { getGlobalPoseDetector, cleanupGlobalDetector, convertToPixelCoordinates, MediaPipePoseDetector } from '$lib/mediapipe';
+    import { getGlobalPoseDetector, cleanupGlobalDetector, convertToPixelCoordinates, MediaPipePoseDetector, drawPoseLandmarks } from '$lib/mediapipe';
 
     type Props = {
         onRecordingStart?: (startTime: number) => void;
@@ -187,13 +187,17 @@
                             videoLandmarks: landmarks.videoLandmarks,
                         });
                     }
+
                     let normalizedLandmarks = landmarks.videoLandmarks.map((l: Vector3) => ({
                         x: l.x,
                         y: l.y,
                         z: l.z,
                         visibility: l.x >= 0 && l.x <= 1 && l.y >= 0 && l.y <= 1 ? 1 : 0
                     }));
-                    drawPoseLandmarks(normalizedLandmarks);
+
+                    if(poseCanvas && videoElement) {
+                        drawPoseLandmarks(poseCanvas, videoElement, normalizedLandmarks);
+                    }
                 } else if (poseCanvas) {
                     const ctx = poseCanvas.getContext('2d');
                     if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
@@ -224,34 +228,6 @@
     });
 
     let poseCanvas: HTMLCanvasElement | null = $state(null);
-
-    function drawPoseLandmarks(landmarks: NormalizedLandmark[]) {
-        if (!poseCanvas || !videoElement) return;
-        const ctx = poseCanvas.getContext('2d');
-        if (!ctx) return;
-        ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
-
-        // Ensure canvas matches video display size for correct scaling
-        const videoRect = videoElement.getBoundingClientRect();
-        poseCanvas.width = videoRect.width;
-        poseCanvas.height = videoRect.height;
-
-        // Use DrawingUtils from @mediapipe/tasks-vision to draw skeleton
-        const drawingUtils = new DrawingUtils(ctx);
-        // DrawingUtils expects landmarks in normalized coordinates (0-1)
-        // and draws on the canvas sized to the video
-        drawingUtils.drawLandmarks(landmarks, {
-            color: '#00FF00',
-            radius: 2,
-        });
-
-        drawingUtils.drawConnectors(landmarks, 
-            PoseLandmarker.POSE_CONNECTIONS,    
-        {
-            lineWidth: 2,
-            color: '#00BF22',
-        });
-    }
 
     $effect(() => {
         if (enablePoseDetection && !poseReady) {
