@@ -82,9 +82,12 @@ export async function trainNNClassifier(
 
     // Add layers to the model
     model.add(tf.layers.simpleRNN({
-        units: hiddenUnits,
-        returnSequences: false,
-        inputShape: [100, inputs], // Assuming each segment has 100 timesteps with 3 features (x, y, z)
+        units: 16, // Number of units in the RNN layer
+        inputShape: [100, inputs], // Input shape: 100 timesteps, each with 'inputs' features
+    }));
+    model.add(tf.layers.dense({
+        units: hiddenUnits, // Hidden layer with specified number of units
+        activation: 'relu' // Activation function
     }));
     model.add(tf.layers.dense({
         units: segments.length, // Output layer size matches number of labels
@@ -98,15 +101,20 @@ export async function trainNNClassifier(
         metrics: ['accuracy']
     });
 
-    // Prepare training data as 3D tensor: [numSamples, 100, 3]
+    // Prepare training data as 3D tensor: [numSamples, 100, inputs]
     const xs = tf.tensor3d(
       segments.map(seg => {
         // Pad/truncate to 100 timesteps, each with 3 features
         const arr = [];
         for (let i = 0; i < 100; ++i) {
-          const v = seg.data[i] || [0, 0, 0];
-          arr.push([v[0], v[1], v[2]]);
+          const v = seg.data[i] || Array(inputs).fill(0);
+          if (v.length < inputs) {
+            // Pad with zeros if less than inputs
+            v.push(...Array(inputs - v.length).fill(0));
+          }
+          arr.push(v.slice(0, inputs)); // Ensure we only take the first 'inputs' features
         }
+
         return arr;
       })
     );
@@ -119,7 +127,7 @@ export async function trainNNClassifier(
     // Train the model
     const history = await model.fit(xs, ys, {
         epochs,
-        batchSize: 32,
+        batchSize: 16,
         shuffle: true,
         verbose: 1
     });

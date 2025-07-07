@@ -4,7 +4,7 @@
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { createKnnClassifierModel, classifyWithKnnModel, type KnnClassifierModel } from "$lib/knn";
     import { modelStore } from "$lib/modelStore.js";
-    import DynamicTimeWarping from "dynamic-time-warping-ts";
+import { dtwDistance } from "$lib/dtw";
     import { normalizeSkeletonToHipCenter } from "$lib/mediapipe.js";
     import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types.js";
     import { filterToUsedLandmarks } from "$lib/poseLandmarks.js";
@@ -61,12 +61,12 @@
         .filter(d => d.timestamp >= t0Abs && d.timestamp <= t1Abs);
 
       if (recordingType === 'pose') {
-        return (points as PoseDataPoint[]).flatMap(d => {
+        return (points as PoseDataPoint[]).map(d => {
           if ('landmarks' in d) {
             // Normalize landmarks to hip center
             let normalized = normalizeSkeletonToHipCenter(d.landmarks);
             normalized = filterToUsedLandmarks(normalized);
-            return normalized.map(p => [p.x, p.y, p.z]);
+            return normalized.flatMap(p => [p.x, p.y, p.z]);
           }
           return [];
         });
@@ -102,25 +102,6 @@
       return all;
     }
 
-    // Compute DTW distance between two segments
-    export function dtwDistance(a: number[][], b: number[][]): number {
-        const seqA = a.map(v => [v[0], v[1], v[2]]);
-        const seqB = b.map(v => [v[0], v[1], v[2]]);
-        const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => {
-            let sumOfSquares = 0;
-            for (let i = 0; i < x.length; i++) {
-                const diff = x[i] - y[i];
-                sumOfSquares += diff * diff;
-            }
-
-            // Return Euclidean distance
-            return Math.sqrt(
-                sumOfSquares
-            );
-        });
-        return dtw.getDistance();
-    }
-
     // Effect: load segments and compute MDS
     $effect(() => {
       if (!recordings || recordings.length === 0) {
@@ -149,6 +130,7 @@
               dist[i][j] = dist[j][i] = d;
             }
           }
+
           // Import mdsClassic from $lib/mds"
           const { mdsClassic } = await import("$lib/mds");
           ({ points: mdsPoints } = mdsClassic(dist, 2));

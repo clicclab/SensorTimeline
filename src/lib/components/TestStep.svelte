@@ -12,12 +12,15 @@
     import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import { browser } from "$app/environment";
-    import DynamicTimeWarping from "dynamic-time-warping-ts";
+import { dtwDistance } from "$lib/dtw";
     import { onDestroy, onMount } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
     import { flattenSegment } from "$lib/nn";
-    import type { AccelerometerDataPoint } from "$lib/types";
+    import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types";
     import type { Session } from "$lib/session";
+    import { norm } from "@tensorflow/tfjs";
+    import { normalizeSkeletonToHipCenter } from "$lib/mediapipe";
+    import { filterToUsedLandmarks } from "$lib/poseLandmarks";
 
 
     type TestStepProps = {
@@ -36,7 +39,15 @@
         });
     });
 
-    let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state('microbit');
+    // Input source
+    let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
+
+    $effect(() => {
+        if (session.type === 'pose') {
+            inputSource = 'pose';
+            console.log('Setting input source to pose');
+        }
+    });
 
     // PeerJS state
     let peer: Peer | null = $state.raw(null);
@@ -47,7 +58,7 @@
 
     // Accelerometer state
     let accelerometerData: AccelerometerDataPoint | null = $state(null);
-    let dataHistory: Array<AccelerometerDataPoint> = $state([]);
+    let dataHistory: Array<AccelerometerDataPoint> | Array<PoseDataPoint> = $state([]);
     let isReceivingData: boolean = $state(false);
 
     // micro:bit state
@@ -121,17 +132,7 @@
         }
     }
 
-    // Compute DTW distance between two segments
-    export function dtwDistance(a: number[][], b: number[][]): number {
-        const seqA = a.map(v => [v[0], v[1], v[2]]);
-        const seqB = b.map(v => [v[0], v[1], v[2]]);
-        const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
-            Math.pow(x[0] - y[0], 2) +
-            Math.pow(x[1] - y[1], 2) +
-            Math.pow(x[2] - y[2], 2)
-        ));
-        return dtw.getDistance();
-    }
+    // DTW distance is now imported from $lib/dtw
 
     $effect(() => {
         if (browser && inputSource === 'webrtc' && !peer) {
@@ -179,17 +180,23 @@
     let predictInterval: NodeJS.Timeout | null = null;
     let mdsUpdateInterval: NodeJS.Timeout | null = null;
 
+    let isPredicting: boolean = $state(false);
+
     if(browser) {
         predictInterval = setInterval(() => {
-            if (dataHistory.length >= 50) {
+            if (dataHistory.length >= 50 && !isPredicting) {
                 // Update the predicted label every second
+                console.log('Updating predicted label');
+                isPredicting = true;
                 predictLabel();
+                isPredicting = false;
             }
         }, 500);
 
         // Update MDS points every 100ms
         mdsUpdateInterval = setInterval(() => {
             if (!model) return;
+            if(!showMds) return;
             if (isKnnModel(model)) {
                 let knnModel = model as KnnClassifierModel;
                 if(dataHistory.length >= 50) {
@@ -227,27 +234,55 @@
     }
 
     function predictLabel() {
-        if (!model || !accelerometerData) {
+        if (!model || (!accelerometerData && (inputSource === 'microbit' || inputSource === 'webrtc'))) {
             predictedLabel = null;
             return;
         }
 
-        if (dataHistory.length < 50) {
+        if (dataHistory.length < 100) {
+            // Not enough data to make a prediction
+            console.warn('Not enough data to make a prediction');
             predictedLabel = null;
             return;
         }
-        
-        const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
-        
+
+        let data: number[][] = [];
+        let inputFeatures = 3;
+        if (inputSource === 'pose') {
+            // Each dataHistory entry is a pose landmark array: [{x, y, z, ...}, ...]
+            // We'll flatten each pose to a 1D array of [x0, y0, z0, x1, y1, z1, ...]
+            // and stack them as timesteps
+            const poseFrames = dataHistory.slice(-100);
+            if (poseFrames.length > 0) {
+                inputFeatures = poseFrames[0].landmarks.length * 3;
+                data = poseFrames.map((pose: any) => {
+                    // pose is an array of landmarks
+                    return pose.landmarks.flatMap((l: any) => [l.x, l.y, l.z]);
+                });
+            } else {
+                // Not enough pose data, skip prediction
+                predictedLabel = null;
+                console.warn('Not enough pose data to make a prediction');
+                return;
+            }
+        } else {
+            // Accelerometer: [x, y, z]
+            data = dataHistory.slice(-100).map(d => [d.x, d.y, d.z]);
+            inputFeatures = 3;
+        }
+
         if (isNNModel(model)) {
             let nnModel = model as NNClassifierModel;
-            const flat = flattenSegment(data, 50 * 1); // 50 timesteps, 3 features
-            const result = nnPredict(nnModel, flat);
+            // Flatten for all timesteps
+            const flat = data.flat();
+            const result = nnPredict(nnModel, flat, inputFeatures);
             predictedLabel = typeof result === 'string' ? result : null;
         } else if (isKnnModel(model)) {
+            console.log('Using k-NN model for prediction');
             let knnModel = model as KnnClassifierModel;
             const result = classifyWithKnnModel(knnModel, data, dtwDistance);
             predictedLabel = typeof result === 'string' ? result : null;
+            console.log('Predicted label:', predictedLabel);
         } else {
             predictedLabel = null;
         }
@@ -272,6 +307,16 @@
             inputSource = 'pose';
         }
     });
+
+    const onPoseChange = (pose: PoseDataPoint) => {
+        if (inputSource === 'pose') {
+            // Add pose data to history
+            let temp = normalizeSkeletonToHipCenter(pose.landmarks);
+            temp = filterToUsedLandmarks(temp);
+            dataHistory = [...dataHistory.slice(-99), { ...pose, landmarks: temp }];
+            isReceivingData = true;
+        }
+    };
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center mb-6">
@@ -379,6 +424,7 @@
     <WebcamRecorder 
         allowRecording={false}
         enablePoseDetection={inputSource === 'pose'}
+        onPoseChange={onPoseChange}
     />
 </div>
 

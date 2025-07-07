@@ -10,7 +10,9 @@
         allowRecording?: boolean;
         enablePoseDetection?: boolean;
         poseDetectionPaused?: boolean; // Control for pausing pose detection
+        onPoseChange?: (pose: PoseDataPoint) => void;
     };
+
     let {
         onRecordingStart = undefined,
         onRecordingStop = undefined,
@@ -18,6 +20,7 @@
         allowRecording = true,
         enablePoseDetection = false,
         poseDetectionPaused = false,
+        onPoseChange = () => {},
     }: Props = $props();
 
     let videoElement: HTMLVideoElement;
@@ -202,6 +205,12 @@
                     if(poseCanvas && videoElement) {
                         drawPoseLandmarks(poseCanvas, videoElement, normalizedLandmarks);
                     }
+
+                    onPoseChange({
+                        timestamp: Date.now(),
+                        landmarks: normalizedLandmarks,
+                        videoLandmarks: landmarks.videoLandmarks,
+                    });
                 } else if (poseCanvas) {
                     const ctx = poseCanvas.getContext('2d');
                     if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);

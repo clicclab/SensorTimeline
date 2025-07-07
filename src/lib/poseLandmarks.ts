@@ -1,4 +1,4 @@
-import { Vector3 } from "./types.ts";
+import { type Vector3 } from "./types.ts";
 
 export type Point =
     | 'nose'
@@ -117,8 +117,6 @@ export const useLandmarks: Point[] = [
     'rightWrist',
     'leftHip',
     'rightHip',
-    'leftKnee',
-    'rightKnee',
     'leftAnkle',
     'rightAnkle',
 ]

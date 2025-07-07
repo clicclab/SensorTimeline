@@ -102,12 +102,18 @@ export function normalizeSkeletonToHipCenter(landmarks: Vector3[]): Vector3[] {
     const rightHipIdx = landmarkMap.rightHip;
     const leftHip = landmarks[leftHipIdx];
     const rightHip = landmarks[rightHipIdx];
-    if (!leftHip || !rightHip) return landmarks;
+    
+    if (!leftHip || !rightHip) {
+        console.warn("Missing hip landmarks, returning original landmarks");
+        return landmarks;
+    }
+
     const center = {
         x: (leftHip.x + rightHip.x) / 2,
         y: (leftHip.y + rightHip.y) / 2,
         z: (leftHip.z + rightHip.z) / 2
     };
+
     return landmarks.map(lm => ({
         x: lm.x - center.x,
         y: lm.y - center.y,
