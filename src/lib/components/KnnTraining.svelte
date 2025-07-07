@@ -7,6 +7,7 @@
     import DynamicTimeWarping from "dynamic-time-warping-ts";
     import { normalizeSkeletonToHipCenter } from "$lib/mediapipe.js";
     import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types.js";
+    import { filterToUsedLandmarks } from "$lib/poseLandmarks.js";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
@@ -63,7 +64,8 @@
         return (points as PoseDataPoint[]).flatMap(d => {
           if ('landmarks' in d) {
             // Normalize landmarks to hip center
-            const normalized = normalizeSkeletonToHipCenter(d.landmarks);
+            let normalized = normalizeSkeletonToHipCenter(d.landmarks);
+            normalized = filterToUsedLandmarks(normalized);
             return normalized.map(p => [p.x, p.y, p.z]);
           }
           return [];

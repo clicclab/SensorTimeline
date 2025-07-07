@@ -5,10 +5,21 @@
     import { LocalStore } from "$lib/localStore.js";
     import DynamicTimeWarping from "dynamic-time-warping-ts";
     import { modelStore } from "$lib/modelStore";
+    import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types.js";
+    import { normalizeSkeletonToHipCenter } from "$lib/mediapipe.js";
 
     // Accept recordings as prop
     type Props = { recordings: Recording[] };
     let { recordings }: Props = $props();
+
+    let recordingType: 'accelerometer' | 'pose' | null = $state(null);
+    if (recordings.length > 0) {
+      if ('x' in recordings[0].sensorData[0] && 'y' in recordings[0].sensorData[0] && 'z' in recordings[0].sensorData[0]) {
+        recordingType = 'accelerometer';
+      } else if ('landmarks' in recordings[0].sensorData[0]) {
+        recordingType = 'pose';
+      }
+    }
 
     let labeledSegments: Array<LabeledRecording & { data: number[][] }> = $state([]);
     let labels: string[] = $state([]);
@@ -33,10 +44,25 @@
       if (!parent) return [];
       const t0Abs = labeled.t0 < 1e12 ? labeled.recordingStartTime + labeled.t0 : labeled.t0;
       const t1Abs = labeled.t1 < 1e12 ? labeled.recordingStartTime + labeled.t1 : labeled.t1;
+
+
       // Return as array of [x, y, z]
-      return parent.sensorData
-        .filter(d => d.timestamp >= t0Abs && d.timestamp <= t1Abs)
-        .map(d => [d.x, d.y, d.z]);
+      const points = parent.sensorData
+        .filter(d => d.timestamp >= t0Abs && d.timestamp <= t1Abs);
+
+      if (recordingType === 'pose') {
+        return (points as PoseDataPoint[]).flatMap(d => {
+          if ('landmarks' in d) {
+            // Normalize landmarks to hip center
+            const normalized = normalizeSkeletonToHipCenter(d.landmarks);
+            return normalized.map(p => [p.x, p.y, p.z]);
+          }
+          return [];
+        });
+      } else if (recordingType === 'accelerometer') {
+        return (points as AccelerometerDataPoint[]).map(d => [d.x, d.y, d.z]);
+      }
+      return [];
     }
 
     // Load all labeled segments for all recordings

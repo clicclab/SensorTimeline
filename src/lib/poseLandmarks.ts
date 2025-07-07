@@ -1,3 +1,5 @@
+import { Vector3 } from "./types.ts";
+
 export type Point =
     | 'nose'
     | 'leftEyeInner'
@@ -103,4 +105,24 @@ export const landmarkMap: Record<Point, number> = {
   rightHeel: 30,
   leftFootIndex: 31,
   rightFootIndex: 32
+};
+
+export const useLandmarks: Point[] = [
+    'nose',
+    'leftShoulder',
+    'rightShoulder',
+    'leftElbow',
+    'rightElbow',
+    'leftWrist',
+    'rightWrist',
+    'leftHip',
+    'rightHip',
+    'leftKnee',
+    'rightKnee',
+    'leftAnkle',
+    'rightAnkle',
+]
+
+export const filterToUsedLandmarks = (landmarks: Vector3[]): Vector3[] => {
+    return landmarks.filter((_, i) => useLandmarks.includes(allPoints[i]));
 };
