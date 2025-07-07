@@ -35,7 +35,7 @@ export class MediaPipePoseDetector {
      * Detect pose landmarks from a video element at the current time
      * Returns normalized coordinates (0-1) relative to the video frame
      */
-    detectPose(videoElement: HTMLVideoElement): Vector3[] | null {
+    detectPose(videoElement: HTMLVideoElement): {landmarks: Vector3[], videoLandmarks: Vector3[]} | null {
         if (!this.poseLandmarker || !this.isInitialized) {
             return null;
         }
@@ -46,11 +46,18 @@ export class MediaPipePoseDetector {
             if (results.landmarks && results.landmarks.length > 0) {
                 // Convert MediaPipe landmarks to our Vector3 format
                 // MediaPipe returns normalized coordinates (0-1) for x and y
-                return results.landmarks[0].map(landmark => ({
-                    x: landmark.x, // normalized (0-1) relative to video width
-                    y: landmark.y, // normalized (0-1) relative to video height  
-                    z: landmark.z  // relative depth
-                }));
+                return {
+                    landmarks: results.worldLandmarks[0].map(landmark => ({
+                        x: landmark.x, // normalized (0-1) relative to video width
+                        y: landmark.y, // normalized (0-1) relative to video height  
+                        z: landmark.z  // relative depth
+                    })),
+                    videoLandmarks: results.landmarks[0].map(landmark => ({
+                        x: landmark.x, // normalized (0-1) relative to video width
+                        y: landmark.y, // normalized (0-1) relative to video height  
+                        z: landmark.z  // relative depth
+                    }))
+                };
             }
         } catch (error) {
             console.error('Error detecting pose:', error);

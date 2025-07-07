@@ -178,14 +178,16 @@
             if (!enablePoseDetection || !poseReady || !videoElement || !poseDetector) return;
             if (videoElement.readyState >= 2) {
                 const landmarks = poseDetector.detectPose(videoElement);
-                if (landmarks && landmarks.length > 0) {
+                
+                if (landmarks && landmarks.landmarks.length > 0) {
                     if (isRecording) {
                         poseRecordingData.push({
                             timestamp: performance.now(),
-                            landmarks: landmarks as Vector3[]
+                            landmarks: landmarks.landmarks,
+                            videoLandmarks: landmarks.videoLandmarks,
                         });
                     }
-                    drawPoseLandmarks(landmarks);
+                    drawPoseLandmarks(landmarks.videoLandmarks);
                 } else if (poseCanvas) {
                     const ctx = poseCanvas.getContext('2d');
                     if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);

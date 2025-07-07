@@ -12,7 +12,11 @@ export type AccelerometerDataPoint = Vector3 & {
 };
 
 export type PoseDataPoint = {
-    landmarks: Vector3[];
+    // World coordinates of the pose landmarks
+	landmarks: Vector3[];
+	// Video coordinates of the pose landmarks (normalized to video dimensions)
+	videoLandmarks: Vector3[];
+	// Timestamp of the data point
     timestamp: number;
 };
 
