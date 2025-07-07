@@ -1,3 +1,5 @@
+import { AccelerometerDataPoint, PoseDataPoint } from "../types.ts";
+
 export type LabeledRecording = {
 	recordingStartTime: number;
 	t0: number;
@@ -10,6 +12,6 @@ export type Recording = {
 	startTime: number;
 	endTime: number;
 	videoBlob: Blob;
-	sensorData: Array<{ x: number; y: number; z: number; timestamp: number }>;
+	sensorData: Array<AccelerometerDataPoint> | Array<PoseDataPoint>;
 	duration: number;
 };
