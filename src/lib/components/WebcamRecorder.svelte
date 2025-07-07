@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { DrawingUtils, PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision';
     import type { PoseDataPoint, Vector3 } from '$lib/types';
-    import { getGlobalPoseDetector, cleanupGlobalDetector, convertToPixelCoordinates, MediaPipePoseDetector, drawPoseLandmarks } from '$lib/mediapipe';
+    import { getGlobalPoseDetector, cleanupGlobalDetector, MediaPipePoseDetector, drawPoseLandmarks } from '$lib/mediapipe';
 
     type Props = {
         onRecordingStart?: (startTime: number) => void;
@@ -10,13 +9,15 @@
         onRecordingData?: (timestamp: number) => void;
         allowRecording?: boolean;
         enablePoseDetection?: boolean;
+        poseDetectionPaused?: boolean; // Control for pausing pose detection
     };
     let {
         onRecordingStart = undefined,
         onRecordingStop = undefined,
         onRecordingData = undefined,
         allowRecording = true,
-        enablePoseDetection = false
+        enablePoseDetection = false,
+        poseDetectionPaused = false,
     }: Props = $props();
 
     let videoElement: HTMLVideoElement;
@@ -175,8 +176,11 @@
     function startPoseDetectionLoop() {
         if (!enablePoseDetection || !poseReady || !videoElement || !poseDetector) return;
         const detect = () => {
+            // Pose detection not enabled, ready, or video not available
             if (!enablePoseDetection || !poseReady || !videoElement || !poseDetector) return;
-            if (videoElement.readyState >= 2) {
+
+            // Video element must be ready and pose detection not paused
+            if (!poseDetectionPaused && videoElement.readyState >= 2) {
                 const landmarks = poseDetector.detectPose(videoElement);
                 
                 if (landmarks && landmarks.landmarks.length > 0) {
@@ -203,8 +207,10 @@
                     if (ctx) ctx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
                 }
             }
+
             poseDetectionFrame = requestAnimationFrame(detect);
         };
+
         poseDetectionFrame = requestAnimationFrame(detect);
     }
 

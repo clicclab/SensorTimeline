@@ -9,11 +9,12 @@
     type Props = {
         recording: Recording | null;
         onClose?: () => void;
+        onOpen?: () => void;
         savedSelections?: Array<{t0: number, t1: number, label: string}>;
         sessionClasses?: string[]; // Class labels from the active session
     };
 
-    let { recording, onClose = () => {}, savedSelections = $bindable([]), sessionClasses = ['Class 1', 'Class 2'] }: Props = $props();
+    let { recording, onClose = () => {}, onOpen = () => {}, savedSelections = $bindable([]), sessionClasses = ['Class 1', 'Class 2'] }: Props = $props();
 
     let videoElement: HTMLVideoElement | null = $state(null);
     let isPlaying = $state(false);
@@ -82,8 +83,6 @@
         }
     }
 
-    $inspect(currentReading);
-
     function togglePlayback() {
         if (!videoElement) return;
         
@@ -138,7 +137,7 @@
 </script>
 
 {#if recording}
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onintrostart={onOpen}>
         <div class="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
             <!-- Header -->
             <div class="flex items-center justify-between p-4 border-b">

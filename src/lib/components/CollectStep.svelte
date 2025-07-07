@@ -58,6 +58,20 @@ let recordings: Recording[] = $state(session.recordings);
 // Playback modal state
 let selectedRecording: any = $state(null);
 let savedSelections: Array<LabeledRecording> = $state([]);
+let poseDetectionPaused = $state(false);
+
+function handleClosePlayback() {
+    selectedRecording = null;
+    recordings = [...recordings];
+}
+
+$effect(() => {
+    if(selectedRecording) {
+        poseDetectionPaused = true; // Pause pose detection when playback is open
+    } else {
+        poseDetectionPaused = false; // Resume pose detection when playback is closed
+    }
+});
 
 // On mount: Check for ?mockmicrobit=1 in the URL
 if (browser) {
@@ -150,11 +164,6 @@ async function handleDeleteRecording(id: string) {
 
 function handlePlayRecording(recording: any) {
     selectedRecording = recording;
-}
-
-function handleClosePlayback() {
-    selectedRecording = null;
-    recordings = [...recordings];
 }
 
 // micro:bit event handlers
@@ -263,6 +272,7 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
         onRecordingStop={handleRecordingStop}
         {allowRecording}
         enablePoseDetection={inputSource === 'pose' ? true : false}
+        {poseDetectionPaused}
     />
     {#if recordings.length > 0}
         <RecordingsList 
