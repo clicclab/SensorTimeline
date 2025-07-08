@@ -53,6 +53,7 @@ function startSession(session: Session) {
 
 let existingSessions = $state<Session[]>([]);
 
+// This async is necessary
 $effect(async () => {
     existingSessions = await getSessions();
 });
