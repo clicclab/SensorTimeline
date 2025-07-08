@@ -2,7 +2,8 @@ import * as tf from '@tensorflow/tfjs';
 
 export type NNClassifierModel = {
   outputLabels: string[];
-  weights: tf.Sequential | null;
+  weights: tf.LayersModel | null;
+  modelUrl?: string;
 };
 
 export type NNTrainOptions = {
@@ -32,34 +33,32 @@ export function nnPredict(
   input: number[][], // 2D array: [timesteps, features]
   inputFeatures: number = 3 // n: number of features per timestep
 ): string {
-    if (!model.weights) {
-        throw new Error("Model weights not initialized");
+    async function predictWithLoadedModel() {
+        if (!model.weights) {
+            if (!model.modelUrl) throw new Error("Model weights not loaded and no modelUrl provided");
+            model.weights = await tf.loadLayersModel(model.modelUrl);
+        }
+        // Downsample to 50 timesteps using interleaved sampling (take every other timestep)
+        const timesteps = 50;
+        const input3dArr: number[][] = [];
+        for (let i = 0; i < timesteps; ++i) {
+          let idx = i * 2;
+          if (idx >= input.length) idx = input.length - 1;
+          let v = input[idx] || Array(inputFeatures).fill(0);
+          if (v.length < inputFeatures) v = v.concat(Array(inputFeatures - v.length).fill(0));
+          input3dArr.push(v.slice(0, inputFeatures));
+        }
+        const input3d = tf.tensor3d([input3dArr]);
+        const outputTensor = model.weights.predict(input3d) as tf.Tensor;
+        const outputArray = outputTensor.arraySync() as number[][];
+        input3d.dispose();
+        outputTensor.dispose();
+        const predictedIndex = outputArray[0].indexOf(Math.max(...outputArray[0]));
+        return model.outputLabels[predictedIndex];
     }
-
-    // Downsample to 50 timesteps using interleaved sampling (take every other timestep)
-    const timesteps = 50;
-    const input3dArr: number[][] = [];
-    for (let i = 0; i < timesteps; ++i) {
-      let idx = i * 2; // Take every other timestep (0, 2, 4, ...)
-      if (idx >= input.length) idx = input.length - 1; // Use last sample if not enough data
-      let v = input[idx] || Array(inputFeatures).fill(0);
-      if (v.length < inputFeatures) v = v.concat(Array(inputFeatures - v.length).fill(0));
-      input3dArr.push(v.slice(0, inputFeatures));
-    }
-    const input3d = tf.tensor3d([input3dArr]);
-
-    // Forward pass through the model
-    const outputTensor = model.weights.predict(input3d) as tf.Tensor;
-
-    // Get the predicted label index
-    const outputArray = outputTensor.arraySync() as number[][];
-    input3d.dispose();
-    outputTensor.dispose();
-    
-    const predictedIndex = outputArray[0].indexOf(Math.max(...outputArray[0]));
-
-    // Return the corresponding label
-    return model.outputLabels[predictedIndex];
+    // Return a promise for async compatibility
+    // @ts-ignore
+    return predictWithLoadedModel();
 }
 
 // Placeholder: training (returns random weights, no real training)
@@ -142,12 +141,12 @@ export async function trainNNClassifier(
     }));
 
     model.compile({
-      optimizer: tf.train.adam(learningRate * 0.5), // Lower learning rate for better convergence
+      optimizer: tf.train.adam(learningRate * 0.5),
       loss: 'categoricalCrossentropy',
       metrics: ['accuracy']
     });
 
-    const batchSize = Math.min(8, augmentedSamples.length); // Use augmented sample count, smaller batch
+    const batchSize = Math.min(8, augmentedSamples.length);
     const history = await model.fit(xs, ys, {
       epochs,
       batchSize,
@@ -158,10 +157,16 @@ export async function trainNNClassifier(
     xs.dispose();
     ys.dispose();
 
+    // Save model using a unique address and return the address
+    const modelId = `nn-model-${Date.now()}-${Math.floor(Math.random()*1e6)}`;
+    const modelUrl = `localstorage://${modelId}`;
+    await model.save(modelUrl);
+
     return {
       model: {
         outputLabels: uniqueLabels,
-        weights: model
+        weights: null, // Do not store the model instance
+        modelUrl // Save the address for later loading
       },
       loss: history.history.loss as number[]
     };

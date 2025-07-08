@@ -163,9 +163,9 @@
       }
       // Compute predicted labels for each training point
       if (nnModel && labeledSegments.length > 0) {
-        predictedLabels = labeledSegments.map((seg) =>
-          nnPredict(nnModel, seg.data, seg.data[0].length),
-        );
+        predictedLabels = await Promise.all(labeledSegments.map(async (seg) =>
+          await nnPredict(nnModel, seg.data, seg.data[0].length),
+        ));
       } else {
         predictedLabels = [];
       }

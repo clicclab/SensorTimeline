@@ -187,6 +187,7 @@
                 console.log('Updating predicted label');
                 isPredicting = true;
                 predictLabel();
+                console.log('Predicted label:', predictedLabel);
                 isPredicting = false;
             }
         }, 500);
@@ -271,10 +272,13 @@
 
         if (isNNModel(model)) {
             let nnModel = model as NNClassifierModel;
-            // Flatten for all timesteps
-            const flat = data.flat();
-            const result = nnPredict(nnModel, flat, inputFeatures);
-            predictedLabel = typeof result === 'string' ? result : null;
+            // Pass 2D array directly (not flattened)
+            nnPredict(nnModel, data, inputFeatures).then(result => {
+                predictedLabel = typeof result === 'string' ? result : null;
+            }).catch(err => {
+                predictedLabel = null;
+                console.error('NN prediction error:', err);
+            });
         } else if (isKnnModel(model)) {
             console.log('Using k-NN model for prediction');
             let knnModel = model as KnnClassifierModel;
