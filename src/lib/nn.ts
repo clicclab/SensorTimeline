@@ -103,6 +103,13 @@ export async function trainNNClassifier(
       augmentedLabels.push(seg.label);
     }
 
+    const labelCounts = augmentedLabels.reduce((acc, l) => {
+      acc[l] = (acc[l] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('Augmented label counts:', labelCounts);
+
+
     // Prepare training data as 3D tensor: [numSamples, 50, inputs]
     const xs = tf.tensor3d(augmentedSamples);
     // One-hot encode labels using uniqueLabels
@@ -122,6 +129,10 @@ export async function trainNNClassifier(
       returnSequences: false
     }));
     model.add(tf.layers.dense({
+      units: hiddenUnits * 2,
+      activation: 'relu'
+    }));
+    model.add(tf.layers.dense({
       units: hiddenUnits,
       activation: 'relu'
     }));
@@ -131,12 +142,12 @@ export async function trainNNClassifier(
     }));
 
     model.compile({
-      optimizer: tf.train.adam(learningRate),
+      optimizer: tf.train.adam(learningRate * 0.5), // Lower learning rate for better convergence
       loss: 'categoricalCrossentropy',
       metrics: ['accuracy']
     });
 
-    const batchSize = Math.min(16, segments.length);
+    const batchSize = Math.min(8, augmentedSamples.length); // Use augmented sample count, smaller batch
     const history = await model.fit(xs, ys, {
       epochs,
       batchSize,
