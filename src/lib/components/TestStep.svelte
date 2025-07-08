@@ -378,7 +378,7 @@
   {/if}
 </div>
 
-{#if accelerometerData}
+{#if accelerometerData || (inputSource === 'pose' && dataHistory.length > 0)}
     <div class="bg-white rounded-lg p-4 shadow-sm mb-4 mt-4">
         <div class="flex items-center justify-between">
             <h3 class="font-medium text-gray-900">Live Prediction</h3>
