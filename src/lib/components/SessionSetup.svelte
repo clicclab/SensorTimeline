@@ -4,7 +4,7 @@ import { createSession, getSessions, saveSession } from "$lib/session";
 
 let sessionType: SessionType | null = $state(null);
 let classInput = $state("");
-let classes: string[] = $state(["Class 1", "Class 2"]);
+let classes: string[] = $state([]);
 let error = $state("");
 
 type Props = {
