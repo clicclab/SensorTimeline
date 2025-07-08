@@ -77,66 +77,73 @@ export async function trainNNClassifier(
 ): Promise<NNTrainResult> {
     console.log("Training NN Classifier with options:", options);
     const { epochs, learningRate, hiddenUnits } = options;
-    // Create a simple sequential model
-    const model = tf.sequential();
 
-    // Add layers to the model
-    model.add(tf.layers.simpleRNN({
-        units: 16, // Number of units in the RNN layer
-        inputShape: [100, inputs], // Input shape: 100 timesteps, each with 'inputs' features
-    }));
-    model.add(tf.layers.dense({
-        units: hiddenUnits, // Hidden layer with specified number of units
-        activation: 'relu' // Activation function
-    }));
-    model.add(tf.layers.dense({
-        units: segments.length, // Output layer size matches number of labels
-        activation: 'softmax' // Multi-class classification
-    }));
-
-    // Compile the model
-    model.compile({
-        optimizer: tf.train.adam(learningRate),
-        loss: 'categoricalCrossentropy',
-        metrics: ['accuracy']
-    });
+    // Get unique labels and mapping
+    const uniqueLabels = Array.from(new Set(segments.map(s => s.label)));
+    const labelToIndex = Object.fromEntries(uniqueLabels.map((l, i) => [l, i]));
 
     // Prepare training data as 3D tensor: [numSamples, 100, inputs]
     const xs = tf.tensor3d(
       segments.map(seg => {
-        // Pad/truncate to 100 timesteps, each with 3 features
         const arr = [];
         for (let i = 0; i < 100; ++i) {
           const v = seg.data[i] || Array(inputs).fill(0);
           if (v.length < inputs) {
-            // Pad with zeros if less than inputs
             v.push(...Array(inputs - v.length).fill(0));
           }
-          arr.push(v.slice(0, inputs)); // Ensure we only take the first 'inputs' features
+          arr.push(v.slice(0, inputs));
         }
-
         return arr;
       })
     );
-    
-    const ys = tf.tensor2d(segments.map(seg => {
-        const labelIndex = segments.findIndex(s => s.label === seg.label);
-        return Array.from({ length: segments.length }, (_, i) => (i === labelIndex ? 1 : 0));
+
+    // One-hot encode labels using uniqueLabels
+    const ys = tf.tensor2d(
+      segments.map(seg => {
+        const arr = Array(uniqueLabels.length).fill(0);
+        arr[labelToIndex[seg.label]] = 1;
+        return arr;
+      })
+    );
+
+    // Create a simple sequential model
+    const model = tf.sequential();
+    model.add(tf.layers.lstm({
+      units: hiddenUnits,
+      inputShape: [100, inputs],
+      returnSequences: false
+    }));
+    model.add(tf.layers.dense({
+      units: hiddenUnits,
+      activation: 'relu'
+    }));
+    model.add(tf.layers.dense({
+      units: uniqueLabels.length,
+      activation: 'softmax'
     }));
 
-    // Train the model
-    const history = await model.fit(xs, ys, {
-        epochs,
-        batchSize: 16,
-        shuffle: true,
-        verbose: 1
+    model.compile({
+      optimizer: tf.train.adam(learningRate),
+      loss: 'categoricalCrossentropy',
+      metrics: ['accuracy']
     });
 
+    const batchSize = Math.min(16, segments.length);
+    const history = await model.fit(xs, ys, {
+      epochs,
+      batchSize,
+      shuffle: true,
+      verbose: 1
+    });
+
+    xs.dispose();
+    ys.dispose();
+
     return {
-        model: {
-        outputLabels: segments.map(seg => seg.label),
+      model: {
+        outputLabels: uniqueLabels,
         weights: model
-        },
-        loss: history.history.loss as number[]
+      },
+      loss: history.history.loss as number[]
     };
 }
