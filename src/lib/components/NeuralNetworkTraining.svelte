@@ -7,11 +7,12 @@
   } from "$lib/nn";
   import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
   import { LocalStore } from "$lib/localStore.js";
-import { dtwDistance } from "$lib/dtw";
+  import { dtwDistance } from "$lib/dtw";
   import { modelStore } from "$lib/modelStore";
   import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types.js";
   import { normalizeSkeletonToHipCenter } from "$lib/mediapipe.js";
   import { filterToUsedLandmarks } from "$lib/poseLandmarks.js";
+    import { tick } from "svelte";
 
   // Accept recordings as prop
   type Props = { recordings: Recording[] };
@@ -37,7 +38,7 @@ import { dtwDistance } from "$lib/dtw";
 
   // Placeholder for neural network parameters
   let epochs = $state(30);
-  let learningRate = $state(0.001);
+  let learningRate = $state(0.002);
   let hiddenUnits = $state(16);
 
   // Placeholder for training state
@@ -116,58 +117,63 @@ import { dtwDistance } from "$lib/dtw";
 
   async function handleTrain() {
     isTraining = true;
-    await Promise.resolve();
-    trainLoss = [];
-    await Promise.resolve();
-    // Prepare segments
-    const segments = labeledSegments.map(({ label, data }) => ({
-      label,
-      data,
-    }));
-    const result = await trainNNClassifier(
-      segments,
-      { epochs, learningRate, hiddenUnits },
-      segments[0].data[0].length,
-    );
-
-    nnModel = result.model;
-    modelStore.set(nnModel); // Save model to store for use in test step
-    trainLoss = result.loss;
-
-    const segs = await loadLabeledSegments();
-    labeledSegments = segs;
-    labels = segs.map((s) => s.label);
-
-    if (segs.length < 2) {
-      mdsPoints = [];
-      predictedLabels = [];
-      isTraining = false;
-      return;
-    }
-
-    if (segs.length >= 2) {
-      const n = segs.length;
-      const dist: number[][] = Array.from({ length: n }, () =>
-        Array(n).fill(0),
+    await tick();
+    await (async () => {
+      trainLoss = [];
+      // Prepare segments
+      const segments = labeledSegments.map(({ label, data }) => ({
+        label,
+        data,
+      }));
+      await tick();
+      const result = await trainNNClassifier(
+        segments,
+        { epochs, learningRate, hiddenUnits },
+        segments[0].data[0].length,
       );
-      for (let i = 0; i < n; ++i) {
-        for (let j = i + 1; j < n; ++j) {
-          const d = dtwDistance(segs[i].data, segs[j].data);
-          dist[i][j] = dist[j][i] = d;
-        }
+
+      nnModel = result.model;
+      modelStore.set(nnModel); // Save model to store for use in test step
+      trainLoss = result.loss;
+
+      const segs = await loadLabeledSegments();
+      labeledSegments = segs;
+      labels = segs.map((s) => s.label);
+
+      if (segs.length < 2) {
+        mdsPoints = [];
+        predictedLabels = [];
+        isTraining = false;
+        return;
       }
-      const { mdsClassic } = await import("$lib/mds");
-      ({ points: mdsPoints } = mdsClassic(dist, 2));
-    }
-    // Compute predicted labels for each training point
-    if (nnModel && labeledSegments.length > 0) {
-      predictedLabels = labeledSegments.map((seg) =>
-        nnPredict(nnModel, seg.data, seg.data[0].length),
-      );
-    } else {
-      predictedLabels = [];
-    }
-    isTraining = false;
+
+      if (segs.length >= 2) {
+        const n = segs.length;
+        const dist: number[][] = Array.from({ length: n }, () =>
+          Array(n).fill(0),
+        );
+        for (let i = 0; i < n; ++i) {
+          for (let j = i + 1; j < n; ++j) {
+            const d = dtwDistance(segs[i].data, segs[j].data);
+            dist[i][j] = dist[j][i] = d;
+          }
+        }
+        const { mdsClassic } = await import("$lib/mds");
+        ({ points: mdsPoints } = mdsClassic(dist, 2));
+      }
+      // Compute predicted labels for each training point
+      if (nnModel && labeledSegments.length > 0) {
+        predictedLabels = labeledSegments.map((seg) =>
+          nnPredict(nnModel, seg.data, seg.data[0].length),
+        );
+      } else {
+        predictedLabels = [];
+      }
+      isTraining = false;
+    })().catch((err) => {
+      console.error("Error during training:", err);
+      isTraining = false;
+    });
   }
 </script>
 
@@ -182,7 +188,7 @@ import { dtwDistance } from "$lib/dtw";
       <input
         type="range"
         min="2"
-        max="45"
+        max="24"
         step="1"
         bind:value={hiddenUnits}
         class="w-full accent-blue-600"
