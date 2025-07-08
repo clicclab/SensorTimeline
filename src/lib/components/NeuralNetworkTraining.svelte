@@ -3,7 +3,6 @@
   import {
     trainNNClassifier,
     nnPredict,
-    flattenSegment,
     type NNClassifierModel,
   } from "$lib/nn";
   import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
@@ -163,7 +162,7 @@ import { dtwDistance } from "$lib/dtw";
     // Compute predicted labels for each training point
     if (nnModel && labeledSegments.length > 0) {
       predictedLabels = labeledSegments.map((seg) =>
-        nnPredict(nnModel, flattenSegment(seg.data, 100), seg.data[0].length),
+        nnPredict(nnModel, seg.data, seg.data[0].length),
       );
     } else {
       predictedLabels = [];

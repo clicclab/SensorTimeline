@@ -12,13 +12,11 @@
     import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import { browser } from "$app/environment";
-import { dtwDistance } from "$lib/dtw";
+    import { dtwDistance } from "$lib/dtw";
     import { onDestroy, onMount } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
-    import { flattenSegment } from "$lib/nn";
     import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types";
     import type { Session } from "$lib/session";
-    import { norm } from "@tensorflow/tfjs";
     import { normalizeSkeletonToHipCenter } from "$lib/mediapipe";
     import { filterToUsedLandmarks } from "$lib/poseLandmarks";
 

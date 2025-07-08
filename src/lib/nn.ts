@@ -16,17 +16,6 @@ export type NNTrainResult = {
   loss: number[];
 };
 
-// Utility to flatten a segment's data for input to the NN
-export function flattenSegment(segment: number[][], maxLen: number): number[] {
-  // Pad or truncate to maxLen, flatten [x,y,z] per timestep
-  const flat: number[] = [];
-  for (let i = 0; i < maxLen; ++i) {
-    const v = segment[i] || [0, 0, 0];
-    flat.push(v[0], v[1], v[2]);
-  }
-  return flat;
-}
-
 // Create a new NN model
 export function createNNClassifierModel(
   outputLabels: string[],
@@ -37,25 +26,26 @@ export function createNNClassifierModel(
   };
 }
 
-// Placeholder: forward pass (single sample)
+// Forward pass (single sample)
 export function nnPredict(
   model: NNClassifierModel,
-  input: number[],
+  input: number[][], // 2D array: [timesteps, features]
   inputFeatures: number = 3 // n: number of features per timestep
 ): string {
     if (!model.weights) {
         throw new Error("Model weights not initialized");
     }
 
-    // Convert input to tensor3d: [1, 100, n]
-    const timesteps = 100;
-    const input3dArr = Array.from({length: timesteps}, (_, i) => {
-      const step: number[] = [];
-      for (let j = 0; j < inputFeatures; ++j) {
-        step.push(input[i*inputFeatures + j] || 0);
-      }
-      return step;
-    });
+    // Downsample to 50 timesteps using interleaved sampling (take every other timestep)
+    const timesteps = 50;
+    const input3dArr: number[][] = [];
+    for (let i = 0; i < timesteps; ++i) {
+      let idx = i * 2; // Take every other timestep (0, 2, 4, ...)
+      if (idx >= input.length) idx = input.length - 1; // Use last sample if not enough data
+      let v = input[idx] || Array(inputFeatures).fill(0);
+      if (v.length < inputFeatures) v = v.concat(Array(inputFeatures - v.length).fill(0));
+      input3dArr.push(v.slice(0, inputFeatures));
+    }
     const input3d = tf.tensor3d([input3dArr]);
 
     // Forward pass through the model
@@ -63,6 +53,9 @@ export function nnPredict(
 
     // Get the predicted label index
     const outputArray = outputTensor.arraySync() as number[][];
+    input3d.dispose();
+    outputTensor.dispose();
+    
     const predictedIndex = outputArray[0].indexOf(Math.max(...outputArray[0]));
 
     // Return the corresponding label
@@ -82,26 +75,41 @@ export async function trainNNClassifier(
     const uniqueLabels = Array.from(new Set(segments.map(s => s.label)));
     const labelToIndex = Object.fromEntries(uniqueLabels.map((l, i) => [l, i]));
 
-    // Prepare training data as 3D tensor: [numSamples, 100, inputs]
-    const xs = tf.tensor3d(
-      segments.map(seg => {
-        const arr = [];
-        for (let i = 0; i < 100; ++i) {
-          const v = seg.data[i] || Array(inputs).fill(0);
-          if (v.length < inputs) {
-            v.push(...Array(inputs - v.length).fill(0));
-          }
-          arr.push(v.slice(0, inputs));
-        }
-        return arr;
-      })
-    );
+    // Downsample to 50 timesteps and augment: split each 100-step segment into two 50-step samples
+    const augmentedSamples: number[][][] = [];
+    const augmentedLabels: string[] = [];
+    for (const seg of segments) {
+      // Interleaved sample 1: odd indices (1,3,5,...,99)
+      const arr1: number[][] = [];
+      for (let i = 0; i < 50; ++i) {
+        let idx = 1 + i * 2;
+        if (idx >= seg.data.length) idx = seg.data.length - 1;
+        let v = seg.data[idx] || Array(inputs).fill(0);
+        if (v.length < inputs) v = v.concat(Array(inputs - v.length).fill(0));
+        arr1.push(v.slice(0, inputs));
+      }
+      augmentedSamples.push(arr1);
+      augmentedLabels.push(seg.label);
+      // Interleaved sample 2: even indices (0,2,4,...,98)
+      const arr2: number[][] = [];
+      for (let i = 0; i < 50; ++i) {
+        let idx = i * 2;
+        if (idx >= seg.data.length) idx = seg.data.length - 1;
+        let v = seg.data[idx] || Array(inputs).fill(0);
+        if (v.length < inputs) v = v.concat(Array(inputs - v.length).fill(0));
+        arr2.push(v.slice(0, inputs));
+      }
+      augmentedSamples.push(arr2);
+      augmentedLabels.push(seg.label);
+    }
 
+    // Prepare training data as 3D tensor: [numSamples, 50, inputs]
+    const xs = tf.tensor3d(augmentedSamples);
     // One-hot encode labels using uniqueLabels
     const ys = tf.tensor2d(
-      segments.map(seg => {
+      augmentedLabels.map(label => {
         const arr = Array(uniqueLabels.length).fill(0);
-        arr[labelToIndex[seg.label]] = 1;
+        arr[labelToIndex[label]] = 1;
         return arr;
       })
     );
@@ -110,7 +118,7 @@ export async function trainNNClassifier(
     const model = tf.sequential();
     model.add(tf.layers.lstm({
       units: hiddenUnits,
-      inputShape: [100, inputs],
+      inputShape: [50, inputs],
       returnSequences: false
     }));
     model.add(tf.layers.dense({
