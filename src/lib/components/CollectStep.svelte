@@ -14,6 +14,7 @@ import PlaybackModal from "$lib/components/PlaybackModal.svelte";
 import PoseInputController from "$lib/components/PoseInputController.svelte";
 import type { AccelerometerDataPoint, LabeledRecording, Recording } from "$lib/types";
 import { saveSession, type Session } from "$lib/session";
+import { onDestroy } from "svelte";
 
 // Props
  type Props = {
@@ -225,6 +226,39 @@ $effect(() => {
 });
 $effect(() => {
     clearDataHistory();
+});
+
+
+onDestroy(async () => {
+    // Disconnect WebRTC connection
+    if (peer) {
+        if (connection) {
+            connection.close();
+            connection = null;
+        }
+        peer.destroy();
+        peer = null;
+        peerId = null;
+        peerStatus = null;
+    }
+
+    // Disconnect micro:bit connection
+    if (isMicroBitConnected) {
+        isMicroBitConnected = false;
+        clearDataHistory();
+    }
+
+    // Clear all reactive states
+    accelerometerData = null;
+    dataHistory = [];
+    isReceivingData = false;
+
+    let microBitApi = useMockMicroBit
+                ? await import("$lib/microBitMock")
+                : await import("$lib/microBit");
+    if (microBitApi && microBitApi.disconnect) {
+        await microBitApi.disconnect();
+    }
 });
 
 // Derived
