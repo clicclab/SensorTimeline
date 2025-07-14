@@ -21,11 +21,12 @@
     import { filterToUsedLandmarks } from "$lib/poseLandmarks";
 
 
-    type TestStepProps = {
-        stepBack: () => void;
-        session: Session;
-    };
-    let { stepBack, session }: TestStepProps = $props();
+type TestStepProps = {
+    stepBack: () => void;
+    onExport?: () => void;
+    session: Session;
+};
+let { stepBack, onExport, session }: TestStepProps = $props();
 
     let model: NNClassifierModel | KnnClassifierModel | null = $state(null);
 
@@ -558,11 +559,22 @@
 {/if}
 
 <div class="flex justify-start mt-8">
-    <button
-        onclick={stepBack}
-        class="px-6 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
-        aria-label="Back: Train Model"
-    >
-        &larr; Back: Train Model
-    </button>
+    <div class="flex justify-between mt-8">
+        <button
+            onclick={stepBack}
+            class="px-6 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+            aria-label="Back: Train Model"
+        >
+            &larr; Back: Train Model
+        </button>
+        {#if onExport}
+            <button
+                onclick={onExport}
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow ml-4"
+                aria-label="Export Model"
+            >
+                Export Model
+            </button>
+        {/if}
+    </div>
 </div>

@@ -1,16 +1,17 @@
 <script lang="ts">
     import { browser } from "$app/environment";
-    import CollectStep from "$lib/components/CollectStep.svelte";
-    import TrainStep from "$lib/components/TrainStep.svelte";
-    import TestStep from "$lib/components/TestStep.svelte";
-    import SessionSetup from "$lib/components/SessionSetup.svelte";
-    import SessionInfoHeader from "$lib/components/SessionInfoHeader.svelte";
+import CollectStep from "$lib/components/CollectStep.svelte";
+import TrainStep from "$lib/components/TrainStep.svelte";
+import TestStep from "$lib/components/TestStep.svelte";
+import ExportStep from "$lib/components/ExportStep.svelte";
+import SessionSetup from "$lib/components/SessionSetup.svelte";
+import SessionInfoHeader from "$lib/components/SessionInfoHeader.svelte";
     import { getSessionById, type Session } from "$lib/session";
     import { onMount } from "svelte";
     
     // Step-based workflow state
-    type Step = 'setup' | 'collect' | 'train' | 'test';
-    let step: Step = $state('setup');
+type Step = 'setup' | 'collect' | 'train' | 'test' | 'export';
+let step: Step = $state('setup');
     let activeSession: Session | null = $state(null);
 
     // Sync step with query param on mount
@@ -87,6 +88,15 @@
                     <SessionInfoHeader session={activeSession} onReset={handleSessionReset} />
                     <TestStep
                         stepBack={() => (step = 'train')}
+                        onExport={() => (step = 'export')}
+                        session={activeSession}
+                    />
+                {/if}
+            {:else if step === 'export'}
+                {#if activeSession}
+                    <SessionInfoHeader session={activeSession} onReset={handleSessionReset} />
+                    <ExportStep
+                        stepBack={() => (step = 'test')}
                         session={activeSession}
                     />
                 {/if}
