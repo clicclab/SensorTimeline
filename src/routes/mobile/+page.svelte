@@ -3,6 +3,7 @@
     import Peer, { type DataConnection } from "peerjs";
     import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
     import QRScanner from "$lib/components/QRScanner.svelte";
+    import type { AccelerometerDataPoint } from "$lib/types";
 
     let peer: Peer | null = $state.raw(null);
     let peerId: string | null = $state(null);
@@ -11,7 +12,7 @@
     let showScanner: boolean = $state(false);
     let showQRCode: boolean = $state(false);
     let isStreaming: boolean = $state(false);
-    let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
+    let accelerometerData: AccelerometerDataPoint | null = $state(null);
     let streamingInterval: ReturnType<typeof setInterval> | null = null;
     let permissionGranted: boolean = $state(false);
     let deviceMotionHandler: ((event: DeviceMotionEvent) => void) | null = null;

@@ -1,5 +1,3 @@
-import { type LabeledRecording } from "./components/LabeledRecordings.ts";
-
 export type KnnResult = {
   label: string;
   distance: number;
@@ -65,6 +63,7 @@ export type KnnClassifierModel = {
   k: number;
   maxDistance: number;
   distanceMetric: "dtw";
+  downsampleRatio: number; // 0 < ratio <= 1
   segments: Array<{
     label: string;
     data: number[][];
@@ -74,13 +73,31 @@ export type KnnClassifierModel = {
 export function createKnnClassifierModel(
   labeledSegments: Array<{ label: string; data: number[][] }>,
   k: number,
-  maxDistance: number
+  maxDistance: number,
+  downsampleRatio: number = 0.5 // default: half the samples
 ): KnnClassifierModel {
+  // Downsample each segment according to the ratio
+  function downsample(data: number[][], ratio: number): number[][] {
+    if (ratio >= 1) return data;
+    const targetLen = Math.max(1, Math.round(data.length * ratio));
+    if (targetLen >= data.length) return data;
+    const step = data.length / targetLen;
+    const out: number[][] = [];
+    for (let i = 0; i < targetLen; ++i) {
+      const idx = Math.round(i * step);
+      out.push(data[Math.min(idx, data.length - 1)]);
+    }
+    return out;
+  }
   return {
     k,
     maxDistance,
     distanceMetric: "dtw",
-    segments: labeledSegments.map(({ label, data }) => ({ label, data }))
+    downsampleRatio,
+    segments: labeledSegments.map(({ label, data }) => ({
+      label,
+      data: downsample(data, downsampleRatio)
+    }))
   };
 }
 

@@ -1,38 +1,16 @@
 <script lang="ts">
     import LabeledRecordingsList from "$lib/components/LabeledRecordingsList.svelte";
+    import { formatDuration, formatFileSize } from "$lib/formatUtils";
+    import type { LabeledRecording, Recording } from "$lib/types";
 
     type Props = {
-        recordings?: Array<{
-            id: string;
-            startTime: number;
-            endTime: number;
-            videoBlob: Blob;
-            sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
-            duration: number;
-        }>;
+        recordings?: Recording[];
         onDeleteRecording?: (id: string) => void;
         onPlayRecording?: (recording: any) => void;
-        savedSelections?: Array<{
-            t0: number;
-            t1: number;
-            label: string;
-        }>;
+        savedSelections?: Array<LabeledRecording>;
     };
 
     let { recordings = [], onDeleteRecording, onPlayRecording, savedSelections = $bindable([]) }: Props = $props();
-
-    function formatDuration(ms: number): string {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        
-        return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-
-    function formatFileSize(bytes: number): string {
-        const mb = bytes / (1024 * 1024);
-        return `${mb.toFixed(1)} MB`;
-    }
 
     function downloadVideo(recording: any) {
         const url = URL.createObjectURL(recording.videoBlob);
@@ -153,6 +131,6 @@
             <h3 class="font-medium text-gray-900">Labeled Recordings</h3>
             <!-- Optionally, you can show a count by passing a derived value from the child, or omit for now -->
         </div>
-        <LabeledRecordingsList recordings={recordings} />
+        <LabeledRecordingsList recordings={recordings} bind:labeledRecordings={savedSelections} />
     {/if}
 </div>

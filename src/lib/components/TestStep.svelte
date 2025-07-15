@@ -12,17 +12,21 @@
     import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
     import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
     import { browser } from "$app/environment";
-    import DynamicTimeWarping from "dynamic-time-warping-ts";
+    import { dtwDistance } from "$lib/dtw";
     import { onDestroy, onMount } from "svelte";
     import MdsPlot from "$lib/components/ui/MdsPlot.svelte";
-    import { flattenSegment } from "$lib/nn";
-    import { data } from "@tensorflow/tfjs";
+    import type { AccelerometerDataPoint, PoseDataPoint } from "$lib/types";
+    import type { Session } from "$lib/session";
+    import { normalizeSkeletonToHipCenter } from "$lib/mediapipe";
+    import { filterToUsedLandmarks } from "$lib/poseLandmarks";
 
 
-    type TestStepProps = {
-        stepBack: () => void;
-    };
-    let { stepBack }: TestStepProps = $props();
+type TestStepProps = {
+    stepBack: () => void;
+    onExport?: () => void;
+    session: Session;
+};
+let { stepBack, onExport, session }: TestStepProps = $props();
 
     let model: NNClassifierModel | KnnClassifierModel | null = $state(null);
 
@@ -34,7 +38,15 @@
         });
     });
 
-    let inputSource: 'webrtc' | 'microbit' = $state('microbit');
+    // Input source
+    let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
+
+    $effect(() => {
+        if (session.type === 'pose') {
+            inputSource = 'pose';
+            console.log('Setting input source to pose');
+        }
+    });
 
     // PeerJS state
     let peer: Peer | null = $state.raw(null);
@@ -44,8 +56,8 @@
     let otherId: string = $state('');
 
     // Accelerometer state
-    let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
-    let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
+    let accelerometerData: AccelerometerDataPoint | null = $state(null);
+    let dataHistory: Array<AccelerometerDataPoint> | Array<PoseDataPoint> = $state([]);
     let isReceivingData: boolean = $state(false);
 
     // micro:bit state
@@ -55,11 +67,14 @@
     // Prediction state
     let predictedLabel: string | null = $state(null);
 
+    let showMds: boolean = $state(false);
+
     $inspect(model);
 
     function handleIdChange(id: string) {
         otherId = id;
     }
+
     function handleConnect() {
         if (peer && otherId) {
             const conn = peer.connect(otherId);
@@ -75,6 +90,7 @@
             conn.on('error', (err) => {});
         }
     }
+
     function handleDisconnect() {
         clearDataHistory();
         if (connection) {
@@ -82,6 +98,7 @@
             connection = null;
         }
     }
+
     function handleIncomingData(rawData: any) {
         try {
             const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
@@ -92,11 +109,13 @@
             }
         } catch (error) {}
     }
+
     function clearDataHistory() {
         dataHistory = [];
         accelerometerData = null;
         isReceivingData = false;
     }
+
     function handleMicroBitData(x: number, y: number, z: number) {
         const timestamp = Date.now();
         const newData = { x, y, z, timestamp };
@@ -104,6 +123,7 @@
         dataHistory = [...dataHistory.slice(-99), newData];
         isReceivingData = true;
     }
+
     function handleMicroBitConnectionChange(connected: boolean) {
         isMicroBitConnected = connected;
         if (!connected && inputSource === 'microbit') {
@@ -111,17 +131,7 @@
         }
     }
 
-    // Compute DTW distance between two segments
-    export function dtwDistance(a: number[][], b: number[][]): number {
-        const seqA = a.map(v => [v[0], v[1], v[2]]);
-        const seqB = b.map(v => [v[0], v[1], v[2]]);
-        const dtw = new DynamicTimeWarping(seqA, seqB, (x, y) => Math.sqrt(
-            Math.pow(x[0] - y[0], 2) +
-            Math.pow(x[1] - y[1], 2) +
-            Math.pow(x[2] - y[2], 2)
-        ));
-        return dtw.getDistance();
-    }
+    // DTW distance is now imported from $lib/dtw
 
     $effect(() => {
         if (browser && inputSource === 'webrtc' && !peer) {
@@ -161,6 +171,7 @@
             peerStatus = null;
         }
     });
+
     $effect(() => {
         clearDataHistory();
     });
@@ -168,25 +179,36 @@
     let predictInterval: NodeJS.Timeout | null = null;
     let mdsUpdateInterval: NodeJS.Timeout | null = null;
 
+    let isPredicting: boolean = $state(false);
+
     if(browser) {
         predictInterval = setInterval(() => {
-            if (dataHistory.length >= 50) {
+            if (dataHistory.length >= 50 && !isPredicting) {
                 // Update the predicted label every second
+                console.log('Updating predicted label');
+                isPredicting = true;
                 predictLabel();
+                console.log('Predicted label:', predictedLabel);
+                isPredicting = false;
             }
         }, 500);
 
         // Update MDS points every 100ms
         mdsUpdateInterval = setInterval(() => {
-            if (isKnnModel(model) && dataHistory.length >= 50) {
-                const segments = model.segments;
-                const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
-                mdsLabels = [...segments.map(s => s.label), 'Current Data'];
-                mdsPoints = [...segments.map(s => s.data), data];
-            } else if (isKnnModel(model)) {
-                const segments = model.segments;
-                mdsLabels = segments.map(s => s.label);
-                mdsPoints = segments.map(s => s.data);
+            if (!model) return;
+            if(!showMds) return;
+            if (isKnnModel(model)) {
+                let knnModel = model as KnnClassifierModel;
+                if(dataHistory.length >= 50) {
+                    const segments = knnModel.segments;
+                    const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
+                    mdsLabels = [...segments.map(s => s.label), 'Current Data'];
+                    mdsPoints = [...segments.map(s => s.data), data];
+                } else {
+                    const segments = knnModel.segments;
+                    mdsLabels = segments.map(s => s.label);
+                    mdsPoints = segments.map(s => s.data);
+                }
             } else {
                 mdsLabels = [];
                 mdsPoints = [];
@@ -194,42 +216,109 @@
         }, 100);
     }
 
-    onDestroy(() => {
+    onDestroy(async () => {
         if (predictInterval) {
             clearInterval(predictInterval);
         }
         if (mdsUpdateInterval) {
             clearInterval(mdsUpdateInterval);
         }
+
+        // Disconnect WebRTC connection
+        if (peer) {
+            if (connection) {
+                connection.close();
+                connection = null;
+            }
+            peer.destroy();
+            peer = null;
+            peerId = null;
+            peerStatus = null;
+        }
+
+        // Disconnect micro:bit connection
+        if (isMicroBitConnected) {
+            isMicroBitConnected = false;
+            clearDataHistory();
+        }
+
+        // Clear all reactive states
+        accelerometerData = null;
+        dataHistory = [];
+        isReceivingData = false;
+        predictedLabel = null;
+        mdsPoints = [];
+        mdsLabels = [];
+
+        let microBitApi = useMockMicroBit
+                    ? await import("$lib/microBitMock")
+                    : await import("$lib/microBit");
+        if (microBitApi && microBitApi.disconnect) {
+            await microBitApi.disconnect();
+        }
     });
 
     function isKnnModel(model: any): boolean {
       return model && Array.isArray(model.segments);
     }
+    
     function isNNModel(model: any): boolean {
       return model && Array.isArray(model.outputLabels);
     }
 
     function predictLabel() {
-        if (!model || !accelerometerData) {
+        if (!model || (!accelerometerData && (inputSource === 'microbit' || inputSource === 'webrtc'))) {
             predictedLabel = null;
             return;
         }
 
-        if (dataHistory.length < 50) {
+        if (dataHistory.length < 100) {
+            // Not enough data to make a prediction
+            console.warn('Not enough data to make a prediction');
             predictedLabel = null;
             return;
         }
-        
-        const data = dataHistory.slice(-50).map(d => [d.x, d.y, d.z]);
-        
+
+        let data: number[][] = [];
+        let inputFeatures = 3;
+        if (inputSource === 'pose') {
+            // Each dataHistory entry is a pose landmark array: [{x, y, z, ...}, ...]
+            // We'll flatten each pose to a 1D array of [x0, y0, z0, x1, y1, z1, ...]
+            // and stack them as timesteps
+            const poseFrames = dataHistory.slice(-100);
+            if (poseFrames.length > 0) {
+                inputFeatures = poseFrames[0].landmarks.length * 3;
+                data = poseFrames.map((pose: any) => {
+                    // pose is an array of landmarks
+                    return pose.landmarks.flatMap((l: any) => [l.x, l.y, l.z]);
+                });
+            } else {
+                // Not enough pose data, skip prediction
+                predictedLabel = null;
+                console.warn('Not enough pose data to make a prediction');
+                return;
+            }
+        } else {
+            // Accelerometer: [x, y, z]
+            data = dataHistory.slice(-100).map(d => [d.x, d.y, d.z]);
+            inputFeatures = 3;
+        }
+
         if (isNNModel(model)) {
-            const flat = flattenSegment(data, 50 * 1); // 50 timesteps, 3 features
-            const result = nnPredict(model, flat);
-            predictedLabel = typeof result === 'string' ? result : null;
+            let nnModel = model as NNClassifierModel;
+            // Pass 2D array directly (not flattened)
+            nnPredict(nnModel, data, inputFeatures).then(result => {
+                predictedLabel = typeof result === 'string' ? result : null;
+            }).catch(err => {
+                predictedLabel = null;
+                console.error('NN prediction error:', err);
+            });
         } else if (isKnnModel(model)) {
-            const result = classifyWithKnnModel(model, data, dtwDistance);
+            console.log('Using k-NN model for prediction');
+            let knnModel = model as KnnClassifierModel;
+            const result = classifyWithKnnModel(knnModel, data, dtwDistance);
             predictedLabel = typeof result === 'string' ? result : null;
+            console.log('Predicted label:', predictedLabel);
         } else {
             predictedLabel = null;
         }
@@ -247,6 +336,23 @@
         return acc;
       }, {} as Record<string, string>)
     );
+
+    // Set inputSource based on session.type, and allow switching only for accelerometer
+    $effect(() => {
+        if (session.type === 'pose') {
+            inputSource = 'pose';
+        }
+    });
+
+    const onPoseChange = (pose: PoseDataPoint) => {
+        if (inputSource === 'pose') {
+            // Add pose data to history
+            let temp = normalizeSkeletonToHipCenter(pose.landmarks);
+            temp = filterToUsedLandmarks(temp);
+            dataHistory = [...dataHistory.slice(-99), { ...pose, landmarks: temp }];
+            isReceivingData = true;
+        }
+    };
 </script>
 
 <div class="bg-white rounded-xl p-8 text-center mb-6">
@@ -264,24 +370,41 @@
     </div>
     {#if model && mdsPoints.length >= 2}
       <div class="mb-6 relative">
-        <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
-        <MdsPlot
-          points={mdsPoints}
-          labels={mdsLabels}
-          colors={mdsColors}
-          distance={dtwDistance}
-          width={400}
-          height={320}
-          padding={32}
-        />
-        <div class="flex flex-wrap gap-4 mt-4 justify-center">
-          {#each Array.from(new Set(mdsLabels)) as label}
-            <div class="flex items-center gap-2 text-sm">
-              <span class="inline-block w-4 h-4 rounded-full" style={`background:${mdsColors[label]}`}></span>
-              <span>{label}</span>
+
+        {#if showMds}
+            <h3 class="text-lg font-semibold mb-2">MDS Plot of Labeled Segments</h3>
+            <MdsPlot
+            points={mdsPoints}
+            labels={mdsLabels}
+            colors={mdsColors}
+            distance={dtwDistance}
+            width={400}
+            height={320}
+            padding={32}
+            />
+            <div class="flex flex-wrap gap-4 mt-4 justify-center">
+            {#each Array.from(new Set(mdsLabels)) as label}
+                <div class="flex items-center gap-2 text-sm">
+                <span class="inline-block w-4 h-4 rounded-full" style={`background:${mdsColors[label]}`}></span>
+                <span>{label}</span>
+                </div>
+            {/each}
             </div>
-          {/each}
-        </div>
+            <button
+                class="absolute top-0 right-0 mt-2 mr-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm"
+                onclick={() => (showMds = false)}
+            >
+                Hide MDS Plot
+            </button>
+        {:else}
+            <button
+                class="absolute top-0 right-0 mt-2 mr-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm"
+                onclick={() => (showMds = true)}
+            >
+                Show MDS Plot
+            </button>
+        {/if}
+
       </div>
     {/if}
   {:else}
@@ -289,7 +412,7 @@
   {/if}
 </div>
 
-{#if accelerometerData}
+{#if accelerometerData || (inputSource === 'pose' && dataHistory.length > 0)}
     <div class="bg-white rounded-lg p-4 shadow-sm mb-4 mt-4">
         <div class="flex items-center justify-between">
             <h3 class="font-medium text-gray-900">Live Prediction</h3>
@@ -300,10 +423,12 @@
     </div>
 {/if}
 
-<InputSourceSelector
-    {inputSource}
-    onChange={(val) => (inputSource = val)}
-/>
+{#if session.type === 'accelerometer'}
+    <InputSourceSelector
+        {inputSource}
+        onChange={(val) => (inputSource = val)}
+    />
+{/if}
 {#if inputSource === 'webrtc'}
     <div class="mb-8 p-6 bg-gray-50 rounded-xl">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -334,6 +459,8 @@
 <div class=" mt-4">
     <WebcamRecorder 
         allowRecording={false}
+        enablePoseDetection={inputSource === 'pose'}
+        onPoseChange={onPoseChange}
     />
 </div>
 
@@ -432,11 +559,22 @@
 {/if}
 
 <div class="flex justify-start mt-8">
-    <button
-        onclick={stepBack}
-        class="px-6 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
-        aria-label="Back: Train Model"
-    >
-        &larr; Back: Train Model
-    </button>
+    <div class="flex justify-between mt-8">
+        <button
+            onclick={stepBack}
+            class="px-6 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+            aria-label="Back: Train Model"
+        >
+            &larr; Back: Train Model
+        </button>
+        {#if onExport}
+            <button
+                onclick={onExport}
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow ml-4"
+                aria-label="Export Model"
+            >
+                Export Model
+            </button>
+        {/if}
+    </div>
 </div>

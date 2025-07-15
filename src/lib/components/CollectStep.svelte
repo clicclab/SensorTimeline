@@ -1,7 +1,6 @@
 <script lang="ts">
 import Peer, { type DataConnection } from "peerjs";
 import { browser } from "$app/environment";
-import { LocalStore } from "$lib/localStore";
 import InputSourceSelector from "$lib/components/InputSourceSelector.svelte";
 import ConnectionSection from "$lib/components/ConnectionSection.svelte";
 import MicroBitController from "$lib/components/MicroBitController.svelte";
@@ -12,12 +11,17 @@ import QRCodeDisplay from "$lib/components/QRCodeDisplay.svelte";
 import AccelerometerChart from "$lib/components/AccelerometerChart.svelte";
 import MagnitudeChart from "$lib/components/MagnitudeChart.svelte";
 import PlaybackModal from "$lib/components/PlaybackModal.svelte";
+import PoseInputController from "$lib/components/PoseInputController.svelte";
+import type { AccelerometerDataPoint, LabeledRecording, Recording } from "$lib/types";
+import { saveSession, type Session } from "$lib/session";
+import { onDestroy } from "svelte";
 
 // Props
  type Props = {
     stepForward: () => void;
+    session: Session;
 };
-let { stepForward } = $props();
+let { stepForward, session }: Props = $props();
 
 // PeerJS state
 let peer: Peer | null = $state.raw(null);
@@ -27,8 +31,8 @@ let connection: DataConnection | null = $state.raw(null);
 let otherId: string = $state('');
 
 // Accelerometer state
-let accelerometerData: {x: number, y: number, z: number, timestamp: number} | null = $state(null);
-let dataHistory: Array<{x: number, y: number, z: number, timestamp: number}> = $state([]);
+let accelerometerData: AccelerometerDataPoint | null = $state(null);
+let dataHistory: Array<AccelerometerDataPoint> = $state([]);
 let isReceivingData: boolean = $state(false);
 
 // micro:bit state
@@ -36,93 +40,52 @@ let isMicroBitConnected: boolean = $state(false);
 let useMockMicroBit = $state(false);
 
 // Input source
-let inputSource: 'webrtc' | 'microbit' = $state('microbit');
+let inputSource: 'webrtc' | 'microbit' | 'pose' | null = $state(null);
+
+$effect(() => {
+    if (session.type === 'pose') {
+        inputSource = 'pose';
+    }
+});
 
 // Recording state
 let isRecording: boolean = $state(false);
 let recordingStartTime: number = 0;
-let recordingSensorData: Array<{x: number, y: number, z: number, timestamp: number}> = [];
+let recordingSensorData: Array<AccelerometerDataPoint> = [];
 
 // Recordings store
-let recordingsStore: LocalStore<any> | null = $state.raw(null);
-let recordings: Array<{
-    id: string;
-    startTime: number;
-    endTime: number;
-    videoBlob: Blob;
-    sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
-    duration: number;
-}> = $state([]);
+let recordings: Recording[] = $state(session.recordings);
 
 // Playback modal state
 let selectedRecording: any = $state(null);
-let savedSelections: Array<{t0: number, t1: number, label: string}> = $state([]);
+let savedSelections: Array<LabeledRecording> = $state([]);
+let poseDetectionPaused = $state(false);
 
-// On mount: initialize recordings store and load
+function handleClosePlayback() {
+    selectedRecording = null;
+    recordings = [...recordings];
+}
+
+$effect(() => {
+    if(selectedRecording) {
+        poseDetectionPaused = true; // Pause pose detection when playback is open
+    } else {
+        poseDetectionPaused = false; // Resume pose detection when playback is closed
+    }
+});
+
+// On mount: Check for ?mockmicrobit=1 in the URL
 if (browser) {
-    LocalStore.create<Array<{
-        id: string;
-        startTime: number;
-        endTime: number;
-        videoBlob: Blob;
-        sensorData: Array<{x: number, y: number, z: number, timestamp: number}>;
-        duration: number;
-    }>>("saved-recordings", []).then(store => {
-        recordingsStore = store;
-        recordings = loadRecordings();
-    });
     // Check for ?mockmicrobit=1 in the URL
     const params = new URLSearchParams(window.location.search);
     useMockMicroBit = params.get('mockmicrobit') === '1';
-}
-
-// Helpers for blob encoding
-async function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-function base64ToBlob(base64: string, mimeType: string): Blob {
-    const byteString = atob(base64.split(',')[1]);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([ab], { type: mimeType });
-}
-function loadRecordings(): Array<any> {
-    if (!recordingsStore) return [];
-    const raw = recordingsStore.get() || [];
-    return raw.map((rec: any) => {
-        if (rec.videoBlob && typeof rec.videoBlob === 'object' && rec.videoBlob.base64 && rec.videoBlob.type) {
-            return {
-                ...rec,
-                videoBlob: base64ToBlob(rec.videoBlob.base64, rec.videoBlob.type)
-            };
-        }
-        return rec;
-    });
-}
-async function saveRecordings() {
-    if (!recordingsStore) return;
-    const toStore = await Promise.all(recordings.map(async (rec) => {
-        if (rec.videoBlob instanceof Blob) {
-            const base64 = await blobToBase64(rec.videoBlob);
-            return { ...rec, videoBlob: { base64, type: rec.videoBlob.type } };
-        }
-        return rec;
-    }));
-    await recordingsStore.set(toStore);
 }
 
 // PeerJS connection handlers
 function handleIdChange(id: string) {
     otherId = id;
 }
+
 function handleConnect() {
     if (peer && otherId) {
         const conn = peer.connect(otherId);
@@ -140,6 +103,7 @@ function handleConnect() {
         });
     }
 }
+
 function handleDisconnect() {
     clearDataHistory();
     if (connection) {
@@ -147,6 +111,7 @@ function handleDisconnect() {
         connection = null;
     }
 }
+
 function handleIncomingData(rawData: any) {
     try {
         const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
@@ -162,6 +127,7 @@ function handleIncomingData(rawData: any) {
         // Optionally handle error
     }
 }
+
 function clearDataHistory() {
     dataHistory = [];
     accelerometerData = null;
@@ -174,30 +140,31 @@ function handleRecordingStart(startTime: number) {
     recordingStartTime = startTime;
     recordingSensorData = [];
 }
-function handleRecordingStop(endTime: number, videoBlob: Blob) {
+
+async function handleRecordingStop(endTime: number, videoBlob: Blob, poseData?: any[]) {
     isRecording = false;
     const newRecording = {
         id: `recording-${Date.now()}`,
         startTime: recordingStartTime,
         endTime: endTime,
         videoBlob: videoBlob,
-        sensorData: [...recordingSensorData],
+        sensorData: session.type === 'pose' && poseData ? [...poseData] : [...recordingSensorData],
         duration: endTime - recordingStartTime
     };
     recordings = [...recordings, newRecording];
+    session.recordings = recordings;
+    await saveSession(session);
     recordingSensorData = [];
-    saveRecordings();
 }
-function handleDeleteRecording(id: string) {
+
+async function handleDeleteRecording(id: string) {
     recordings = recordings.filter(r => r.id !== id);
-    saveRecordings();
+    session.recordings = recordings;
+    await saveSession(session);
 }
+
 function handlePlayRecording(recording: any) {
     selectedRecording = recording;
-}
-function handleClosePlayback() {
-    selectedRecording = null;
-    recordings = [...recordings];
 }
 
 // micro:bit event handlers
@@ -261,16 +228,51 @@ $effect(() => {
     clearDataHistory();
 });
 
+
+onDestroy(async () => {
+    // Disconnect WebRTC connection
+    if (peer) {
+        if (connection) {
+            connection.close();
+            connection = null;
+        }
+        peer.destroy();
+        peer = null;
+        peerId = null;
+        peerStatus = null;
+    }
+
+    // Disconnect micro:bit connection
+    if (isMicroBitConnected) {
+        isMicroBitConnected = false;
+        clearDataHistory();
+    }
+
+    // Clear all reactive states
+    accelerometerData = null;
+    dataHistory = [];
+    isReceivingData = false;
+
+    let microBitApi = useMockMicroBit
+                ? await import("$lib/microBitMock")
+                : await import("$lib/microBit");
+    if (microBitApi && microBitApi.disconnect) {
+        await microBitApi.disconnect();
+    }
+});
+
 // Derived
-let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected));
+let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inputSource === 'microbit' && isMicroBitConnected) || inputSource === 'pose');
 
 </script>
 
-<InputSourceSelector
-    {inputSource}
-    onChange={(val) => (inputSource = val)}
-/>
 <div class="space-y-6">
+    {#if session.type === 'accelerometer'}
+      <InputSourceSelector
+        {inputSource}
+        onChange={(val) => (inputSource = val)}
+      />
+    {/if}
     {#if inputSource === 'webrtc'}
         <div class="mb-8 p-6 bg-gray-50 rounded-xl">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -296,24 +298,29 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
             onConnectionChange={handleMicroBitConnectionChange}
             useMock={useMockMicroBit}
         />
+    {:else if inputSource === 'pose'}
+        <PoseInputController />
     {/if}
     <WebcamRecorder 
         onRecordingStart={handleRecordingStart}
         onRecordingStop={handleRecordingStop}
         {allowRecording}
+        enablePoseDetection={inputSource === 'pose' ? true : false}
+        {poseDetectionPaused}
     />
     {#if recordings.length > 0}
         <RecordingsList 
             {recordings}
             onDeleteRecording={handleDeleteRecording}
             onPlayRecording={handlePlayRecording}
-            {savedSelections}
+            bind:savedSelections
         />
     {/if}
     <PlaybackModal 
         recording={selectedRecording}
         onClose={handleClosePlayback}
         {savedSelections}
+        sessionClasses={session.classes}
     />
     {#if (inputSource === 'webrtc' && connection) || (inputSource === 'microbit' && isMicroBitConnected)}
         <div class="bg-gray-50 rounded-xl p-6">
@@ -412,8 +419,9 @@ let allowRecording = $derived((inputSource === 'webrtc' && !!connection) || (inp
 <div class="flex justify-end mt-8">
     <button
         onclick={stepForward}
-        class="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+        class="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Next: Train Model"
+        disabled={savedSelections.length < 2}
     >
         Next: Train Model &rarr;
     </button>

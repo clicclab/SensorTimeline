@@ -1,9 +1,10 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import * as Plotly from 'plotly.js-dist';
+    import type { AccelerometerDataPoint } from '$lib/types';
 
     interface Props {
-        data?: Array<{x: number, y: number, z: number, timestamp: number}>;
+        data?: Array<AccelerometerDataPoint>;
         maxDataPoints?: number;
         recordingStartTime?: number;
         currentVideoTime?: number;

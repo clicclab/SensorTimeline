@@ -1,7 +1,11 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import SelectionChart from "$lib/components/SelectionChart.svelte";
+    import PoseSkeletonMini from "$lib/components/PoseSkeletonMini.svelte";
     import { LocalStore } from "$lib/localStore";
+    import type { AccelerometerDataPoint, PoseDataPoint } from '$lib/types';
+    import { normalizeSkeletonToHipCenter } from '$lib/mediapipe';
+    import { getSkeletonPositions } from "$lib/getSkeletonPositions";
 
     type Props = {
         isPlaying: boolean;
@@ -10,16 +14,12 @@
         formatTime: (s: number) => string;
         onToggle: () => void;
         onSeek: (s: number) => void;
-        sensorData: Array<{
-            x: number;
-            y: number;
-            z: number;
-            timestamp: number;
-        }>;
+        sensorData: AccelerometerDataPoint[] | PoseDataPoint[];
         recordingStartTime: number;
         minSelectionLength?: number; // ms
         maxSelectionLength?: number; // ms
         savedSelections: Array<{ t0: number; t1: number; label: string }>;
+        classLabels?: string[]; // Available class labels for selection
     };
     
     let {
@@ -34,10 +34,12 @@
         minSelectionLength,
         maxSelectionLength,
         savedSelections = $bindable([]),
+        classLabels = ['class A', 'class B'], // Default fallback
     }: Props = $props();
 
     let selectionsStore: LocalStore<Array<{ t0: number; t1: number; label: string }>> | null = null;
 
+    // This async is fine, do not change it to a regular $effect
     $effect(async () => {
         savedSelections;
 
@@ -78,9 +80,21 @@
         }
     });
 
+    let recordingType: 'accelerometer' | 'pose' | null = $state(null);
+
+    if (sensorData.length > 0) {
+        if ('x' in sensorData[0] && 'y' in sensorData[0] && 'z' in sensorData[0]) {
+            recordingType = 'accelerometer';
+        } else if ('landmarks' in sensorData[0]) {
+            recordingType = 'pose';
+        }
+    }
+    
     // Compute chart points, scale t to actualWidth
     let points = $derived(
-        sensorData.map((d) => ({
+        (sensorData.length === 0 || sensorData[0].timestamp === undefined || 
+        sensorData[0].x === undefined || sensorData[0].y === undefined || sensorData[0].z === undefined) ? [] :
+        (sensorData as AccelerometerDataPoint[]).map((d) => ({
             t: ((d.timestamp - recordingStartTime) / duration) * actualWidth,
             x: d.x,
             y: d.y,
@@ -88,18 +102,31 @@
         })),
     );
 
+    let poseData = $derived(
+        (sensorData.length === 0 || !('landmarks' in sensorData[0])) ? [] :
+        (sensorData as PoseDataPoint[]).map((d) => ({
+            timestamp: d.timestamp,
+            landmarks: d.landmarks,
+            videoLandmarks: d.videoLandmarks,
+        })),
+    );
+
     // Find min/max for scaling
     let minVal = $derived(
-        Math.min(...sensorData.map((d) => Math.min(d.x, d.y, d.z)), 0),
+        (sensorData.length === 0 || sensorData[0].x === undefined) ? 0 :
+        Math.min(...(sensorData as AccelerometerDataPoint[]).map((d) => Math.min(d.x, d.y, d.z)), 0),
     );
     let maxVal = $derived(
-        Math.max(...sensorData.map((d) => Math.max(d.x, d.y, d.z)), 0),
+        (sensorData.length === 0 || sensorData[0].x === undefined) ? 0 :
+        Math.max(...(sensorData as AccelerometerDataPoint[]).map((d) => Math.max(d.x, d.y, d.z)), 0),
     );
-    let range = $derived(maxVal - minVal || 1);
 
     // Scale function
-    function scaleY(val: number) {
-        return height - ((val - minVal) / range) * height;
+    function scaleY(val: number, min: number | null = null, max: number | null = null) {
+        min ??= minVal;
+        max ??= maxVal;
+        let range = max - min;
+        return height - ((val - min) / range) * height;
     }
 
     // Selection state (make reactive)
@@ -201,8 +228,14 @@
     }
 
     // Saved selections
-    let saveClass: string = $state('class A');
-    const classOptions = ['class A', 'class B'];
+    let saveClass: string = $state(classLabels[0] || 'class A');
+    
+    // Update saveClass when classLabels change
+    $effect(() => {
+        if (classLabels.length > 0 && !classLabels.includes(saveClass)) {
+            saveClass = classLabels[0];
+        }
+    });
 
     function saveSelection() {
         const sel = getSelectionTimestamps();
@@ -215,6 +248,29 @@
         selectEnd = null;
         hasSelection = false;
     }
+
+    let skeletonPositions = $state(getSkeletonPositions({
+        poseData,
+        duration,
+        recordingStartTime,
+        actualWidth,
+        sampleInterval: duration / 15 // Sample every 15th of the duration
+    }));
+
+    $effect(() => {
+        poseData;
+
+        skeletonPositions = getSkeletonPositions({
+            poseData,
+            duration,
+            recordingStartTime,
+            actualWidth,
+            sampleInterval: duration / 15
+        });
+    });
+
+    $inspect(skeletonPositions);
+
 </script>
 
 <div class="flex items-center space-x-3">
@@ -278,27 +334,46 @@
                         />
                     {/key}
                 {/if}
-                <!-- X Line -->
-                <polyline
-                    fill="none"
-                    stroke="#3b82f6"
-                    stroke-width="2"
-                    points={points.map((p) => `${p.t},${scaleY(p.x)}`).join(" ")}
-                />
-                <!-- Y Line -->
-                <polyline
-                    fill="none"
-                    stroke="#10b981"
-                    stroke-width="2"
-                    points={points.map((p) => `${p.t},${scaleY(p.y)}`).join(" ")}
-                />
-                <!-- Z Line -->
-                <polyline
-                    fill="none"
-                    stroke="#a21caf"
-                    stroke-width="2"
-                    points={points.map((p) => `${p.t},${scaleY(p.z)}`).join(" ")}
-                />
+                {#if recordingType === 'accelerometer'}
+                    <!-- X Line -->
+                    <polyline
+                        fill="none"
+                        stroke="#3b82f6"
+                        stroke-width="2"
+                        points={points.map((p) => `${p.t},${scaleY(p.x)}`).join(" ")}
+                    />
+                    <!-- Y Line -->
+                    <polyline
+                        fill="none"
+                        stroke="#10b981"
+                        stroke-width="2"
+                        points={points.map((p) => `${p.t},${scaleY(p.y)}`).join(" ")}
+                    />
+                    <!-- Z Line -->
+                    <polyline
+                        fill="none"
+                        stroke="#a21caf"
+                        stroke-width="2"
+                        points={points.map((p) => `${p.t},${scaleY(p.z)}`).join(" ")}
+                    />
+                {:else if recordingType === 'pose'}
+                    <!-- Pose skeletons -->
+                    {#each skeletonPositions as skeleton}
+                        <foreignObject
+                            x={skeleton.x - 16}
+                            y={height / 2 - 16}
+                            width={32}
+                            height={32}
+                            style="pointer-events: none;"
+                        >
+                            <PoseSkeletonMini
+                                landmarks={skeleton.landmarks}
+                                width={32}
+                                height={32}
+                            />
+                        </foreignObject>
+                    {/each}
+                {/if}
                 <!-- Current time marker -->
                 <line
                     x1={(currentTime / duration) * actualWidth}
@@ -324,7 +399,7 @@
         <div style="margin-top:0.5em;">
             <label for="class-select" style="margin-right:0.5em;">Class:</label>
             <select id="class-select" bind:value={saveClass} style="font-size:0.95em;">
-                {#each classOptions as opt}
+                {#each classLabels as opt}
                     <option value={opt}>{opt}</option>
                 {/each}
             </select>
@@ -347,10 +422,10 @@
 {#if savedSelections.length > 0}
     <div style="margin-top:2em;">
         <b>Saved selections by class:</b>
-        {#each classOptions as className}
+        {#each classLabels as className}
             {#if savedSelections.filter(s => s.label === className).length > 0}
                 <div style="margin-top:1em;">
-                    <div style="font-weight:bold; color:{className === 'class A' ? '#3b82f6' : '#10b981'};">{className}</div>
+                    <div style="font-weight:bold; color:{className === classLabels[0] ? '#3b82f6' : '#10b981'};">{className}</div>
                     <ul style="margin:0.5em 0 0 0.5em; padding:0; list-style:disc inside;">
                         {#each savedSelections.filter(s => s.label === className) as sel, i}
                             <li style="margin-bottom:0.2em;">
