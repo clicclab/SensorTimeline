@@ -19,7 +19,7 @@ let step: Step = $state('setup');
         if (browser) {
             const params = new URLSearchParams(window.location.search);
             const urlStep = params.get('step');
-            if (urlStep === 'collect' || urlStep === 'train' || urlStep === 'test') {
+            if (urlStep === 'collect' || urlStep === 'train' || urlStep === 'test' || urlStep === 'export') {
                 step = urlStep;
             }
             const sessionId = localStorage.getItem('activeSessionId');

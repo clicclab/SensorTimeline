@@ -2,6 +2,7 @@
 import type { Session } from "$lib/session";
 import { modelStore } from "$lib/modelStore";
 import { exportNNModelToBase64 } from "$lib/nnExport";
+
 type Props = {
     session: Session;
     stepBack: () => void;
@@ -12,8 +13,12 @@ let { session, stepBack }: Props = $props();
 let modelJsonBase64 = $state('');
 let loading = $state(false);
 
-$effect(async () => {
-    const model = modelStore.get();
+modelStore.subscribe(async (model) => {
+    await exportModel(model);
+});
+
+async function exportModel(model: any) {
+    console.log("Exporting model:", model);
     if (!model) {
         modelJsonBase64 = '';
         return;
@@ -22,8 +27,15 @@ $effect(async () => {
     if ('weights' in model) {
         loading = true;
         try {
+            // If weights are not loaded but modelUrl is present, load them first
+            if (!model.weights && model.modelUrl) {
+                const tf = await import('@tensorflow/tfjs');
+                model.weights = await tf.loadLayersModel(model.modelUrl);
+            }
+            if (!model.weights) throw new Error('Model weights are not loaded and no modelUrl present');
             modelJsonBase64 = await exportNNModelToBase64(model);
         } catch (e) {
+            console.error("Error exporting model:", e);
             modelJsonBase64 = '';
         }
         loading = false;
@@ -34,6 +46,13 @@ $effect(async () => {
             ? window.btoa(unescape(encodeURIComponent(json)))
             : '';
     }
+
+    console.log("Exported model JSON base64:", modelJsonBase64);
+}
+
+$effect(async () => {
+    const model = modelStore.get();
+    await exportModel(model);
 });
 
 let copied = $state(false);

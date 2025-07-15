@@ -78,7 +78,7 @@ export class LocalStore<T> {
     }
   }
 
-  subscribe(callback: (value: T) => void): () => void {
+  subscribe(callback: (value: T) => void | Promise<void>): () => void {
     this.subscribers.add(callback);
 
     return () => {
@@ -99,7 +99,17 @@ export class LocalStore<T> {
       await writable.write(JSON.stringify(newValue));
       await writable.close();
       console.log(`[LocalStore] Value set and saved to file:`, newValue);
-      this.subscribers.forEach(callback => callback(this.value));
+      this.subscribers.forEach(callback => {
+        try {
+          const result = callback(this.value);
+          // Only check for Promise if result is not undefined
+          if (typeof result === 'object' && result !== null && typeof (result as Promise<void>).then === 'function') {
+            (result as Promise<void>).catch((e: unknown) => console.error('[LocalStore] Async subscriber error:', e));
+          }
+        } catch (e) {
+          console.error('[LocalStore] Subscriber error:', e);
+        }
+      });
     }
   }
 
