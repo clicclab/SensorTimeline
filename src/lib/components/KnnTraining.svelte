@@ -158,6 +158,31 @@ import { dtwDistance } from "$lib/dtw";
         }));
     });
 
+    // Store the kNN classifier model for use in future steps (e.g., TestStep)
+    $effect(() => {
+        if (!labeledSegments || labeledSegments.length < 2) {
+            modelStore.set(null);
+            return;
+        }
+        // Use cached distanceMatrix for maxDistance adjustment
+        const dists: number[] = [];
+        if (distanceMatrix && distanceMatrix.length > 1) {
+            for (let i = 0; i < distanceMatrix.length; i++) {
+                for (let j = i + 1; j < distanceMatrix.length; j++) {
+                    dists.push(distanceMatrix[i][j]);
+                }
+            }
+        }
+        // Adjust maxDistance based on distance between points
+        const maxDistanceAdjusted = maxDistance * Math.max(...dists) * Math.sqrt(labeledSegments[0].data[0].length);
+        const model = createKnnClassifierModel(
+            labeledSegments.map(({ label, data }) => ({ label, data })),
+            k,
+            maxDistanceAdjusted
+        );
+        modelStore.set(model);
+    });
+
     let mdsOverlayFn: ((x: number, y: number) => string | undefined) = $derived.by(() => {
         if (!normalizedMdsPoints || normalizedMdsPoints.length < 2) return () => undefined;
         return (x: number, y: number) => {
