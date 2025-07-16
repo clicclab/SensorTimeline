@@ -119,6 +119,7 @@
 
   async function handleTrain() {
     isTraining = true;
+    currentEpoch = 0;
     await tick();
     await (async () => {
       trainLoss = [];
