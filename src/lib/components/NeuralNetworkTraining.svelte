@@ -115,6 +115,8 @@
     labels = segs.map((s) => s.label);
   });
 
+  let currentEpoch = $state(0);
+
   async function handleTrain() {
     isTraining = true;
     await tick();
@@ -130,6 +132,11 @@
         segments,
         { epochs, learningRate, hiddenUnits },
         segments[0].data[0].length,
+        (epoch, logs) => {
+          trainLoss.push(logs.loss);
+          currentEpoch = epoch;
+          console.log(`Epoch ${epoch + 1}/${epochs} - Loss: ${logs.loss.toFixed(4)}`);
+        },
       );
 
       nnModel = result.model;
@@ -203,6 +210,23 @@
     >
       {isTraining ? "Training..." : "Train Neural Network"}
     </button>
+  </div>
+  <div class="flex flex-col items-center mb-6">
+    {#if isTraining}
+      <div class="flex items-center gap-2 w-full">
+        <span class="text-sm text-gray-500">Epoch {currentEpoch + 1} / {epochs}</span>
+        <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden min-w-32">
+          <div
+            class="h-full bg-blue-500 transition-all duration-200"
+            style="width: {Math.min(100, Math.round(((currentEpoch + 1) / epochs) * 100))}%"
+            aria-valuenow={currentEpoch + 1}
+            aria-valuemax={epochs}
+            aria-valuemin="0"
+            role="progressbar"
+          ></div>
+        </div>
+      </div>
+    {/if}
   </div>
   {#if nnModel?.weights && mdsPoints.length >= 2}
     <div class="flex flex-col items-center">
