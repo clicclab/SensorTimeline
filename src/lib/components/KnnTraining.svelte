@@ -141,62 +141,39 @@ import { dtwDistance } from "$lib/dtw";
       ({ points: mdsPoints } = mdsClassic(distanceMatrix, 2));
     });
 
-    // Overlay function for MDS plot, using kNN classifier (in MDS coordinates)
-    let mdsOverlayFn: ((x: number, y: number) => string | undefined) = $state((x, y) => undefined);
 
-    $effect(() => {
-        k;
-        maxDistance;
-
-        if (!labeledSegments || labeledSegments.length < 2 || mdsPoints.length < 2) {
-            mdsOverlayFn = () => undefined;
-            return;
-        }
-
+    // Overlay function for MDS plot, using kNN in 2D, fully optimized and memoized
+    const normalizedMdsPoints = $derived.by(() => {
+        if (mdsPoints.length < 2) return [];
         const xs = mdsPoints.map(p => p[0]);
         const ys = mdsPoints.map(p => p[1]);
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
-
-        const dists = [];
-
-        for (let i = 0; i < labeledSegments.length; i++) {
-            for (let j = i + 1; j < labeledSegments.length; j++) {
-                const dist = dtwDistance(labeledSegments[i].data, labeledSegments[j].data);
-                dists.push(dist);
-            }
-        }
-
-        // Adjust maxDistance based on distance between points
-        const maxDistanceAdjusted = maxDistance * Math.max(
-            ...dists
-        ) * Math.sqrt(labeledSegments[0].data[0].length);
-
-        const model = createKnnClassifierModel(
-            labeledSegments.map(({ label, data }) => ({ label, data })),
-            k,
-            maxDistanceAdjusted
-        );
-
-        modelStore.set(model); // Save model to store for use in test step
-        const model2d: KnnClassifierModel = {
-            ...model,
-            maxDistance, // Use original maxDistance for classification on MDS points
-            segments: mdsPoints.map((pt, i) => ({
+        return mdsPoints.map((pt, i) => ({
             label: labeledSegments[i].label,
-            data: [[
+            point: [
                 (pt[0] - minX) / (maxX - minX || 1),
-                (pt[1] - minY) / (maxY - minY || 1),
-                0
-            ]]
-            }))
+                (pt[1] - minY) / (maxY - minY || 1)
+            ]
+        }));
+    });
+
+    let mdsOverlayFn: ((x: number, y: number) => string | undefined) = $derived.by(() => {
+        if (!normalizedMdsPoints || normalizedMdsPoints.length < 2) return () => undefined;
+        return (x: number, y: number) => {
+            const dists = normalizedMdsPoints.map(({ label, point }) => ({
+                label,
+                dist: Math.hypot(point[0] - x, point[1] - y)
+            }));
+            dists.sort((a, b) => a.dist - b.dist);
+            const neighbors = dists.slice(0, k).filter(n => n.dist <= maxDistance);
+            if (neighbors.length === 0) return undefined;
+            const counts = neighbors.reduce<Record<string, number>>((acc, n) => {
+                acc[n.label] = (acc[n.label] || 0) + 1;
+                return acc;
+            }, {});
+            return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
         };
-        const dist2d = (a: number[][], b: number[][]) => {
-            const [p] = a, [q] = b;
-            return Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2));
-        };
-        mdsOverlayFn = (x: number, y: number) => classifyWithKnnModel(model2d, [[x, y, 0]], dist2d);
-        console.log("KNN model created with k =", k, "and maxDistance =", maxDistance);
     });
 
     // SVG plot settings
