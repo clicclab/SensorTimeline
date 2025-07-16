@@ -25,6 +25,7 @@ import { dtwDistance } from "$lib/dtw";
     // State for labeled segments and MDS points
     let labeledSegments: Array<LabeledRecording & { data: number[][] }> = $state([]);
     let mdsPoints: number[][] = $state([]);
+    let distanceMatrix: number[][] = $state([]);
     let labels: string[] = $state([]);
     let k = $state(3);
     let maxDistance = $state(0.5);
@@ -102,11 +103,11 @@ import { dtwDistance } from "$lib/dtw";
       return all;
     }
 
-    // Effect: load segments and compute MDS
+    // Effect: load segments and cache DTW distance matrix
     $effect(() => {
       if (!recordings || recordings.length === 0) {
         labeledSegments = [];
-        mdsPoints = [];
+        distanceMatrix = [];
         labels = [];
         return;
       }
@@ -115,27 +116,29 @@ import { dtwDistance } from "$lib/dtw";
         labeledSegments = segs;
         labels = segs.map(s => s.label);
         if (segs.length < 2) {
-          mdsPoints = [];
+          distanceMatrix = [];
           return;
         }
-
-        // Compute MDS points
-        if (segs.length >= 2) {
-          // Use the same distance function as the plot
-          const n = segs.length;
-          const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-          for (let i = 0; i < n; ++i) {
-            for (let j = i + 1; j < n; ++j) {
-              const d = dtwDistance(segs[i].data, segs[j].data);
-              dist[i][j] = dist[j][i] = d;
-            }
+        const n = segs.length;
+        const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+        for (let i = 0; i < n; ++i) {
+          for (let j = i + 1; j < n; ++j) {
+            const d = dtwDistance(segs[i].data, segs[j].data);
+            dist[i][j] = dist[j][i] = d;
           }
-
-          // Import mdsClassic from $lib/mds"
-          const { mdsClassic } = await import("$lib/mds");
-          ({ points: mdsPoints } = mdsClassic(dist, 2));
         }
+        distanceMatrix = dist;
       })();
+    });
+
+    // Effect: compute and cache MDS projection when distanceMatrix changes
+    $effect(async () => {
+      if (!distanceMatrix || distanceMatrix.length < 2) {
+        mdsPoints = [];
+        return;
+      }
+      const { mdsClassic } = await import("$lib/mds");
+      ({ points: mdsPoints } = mdsClassic(distanceMatrix, 2));
     });
 
     // Overlay function for MDS plot, using kNN classifier (in MDS coordinates)
