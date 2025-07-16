@@ -119,8 +119,14 @@ $effect(async () => {
   {#if error}
     <div class="mb-4 text-red-600">{error}</div>
   {/if}
-  <button type="button" 
-    onclick={handleStartSession} 
-    class="w-full py-3 rounded bg-primary text-black font-bold text-lg mt-2 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-primary-800 focus:ring-2 focus:ring-blue-400 transition-colors"
-    disabled={classes.length < 2 || !sessionType}>Start Session</button>
+  <button
+    type="button"
+    onclick={handleStartSession}
+    class="w-full py-3 bg-green-600 rounded-xl disabled:text-gray-800 disabled:bg-gray-300 font-bold text-lg mt-2 shadow-lg hover:bg-green-400 border-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+    disabled={classes.length < 2 || !sessionType}
+  >
+    <span class="flex items-center justify-center gap-2">
+      Start Session 
+    </span>
+  </button>
 </div>

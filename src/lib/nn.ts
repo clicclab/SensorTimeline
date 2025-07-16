@@ -65,7 +65,10 @@ export function nnPredict(
 export async function trainNNClassifier(
   segments: Array<{ label: string; data: number[][] }>,
   options: NNTrainOptions,
-  inputs: number = 3, // Number of input features (e.g., 3 for x, y, z)
+  inputs: number = 3, // Number of input features (e.g., 3 for x, y, z),
+  onEpochEnd: (epoch: number, logs: { loss: number }) => void = (epoch, logs) => {
+    console.log(`Epoch ${epoch + 1}/${options.epochs} - Loss: ${logs.loss.toFixed(4)}`);
+  }
 ): Promise<NNTrainResult> {
     console.log("Training NN Classifier with options:", options);
     const { epochs, learningRate, hiddenUnits } = options;
@@ -151,7 +154,11 @@ export async function trainNNClassifier(
       epochs,
       batchSize,
       shuffle: true,
-      verbose: 1
+      verbose: 1,
+      yieldEvery: "epoch",
+      callbacks: {
+        onEpochEnd
+      }
     });
 
     xs.dispose();
