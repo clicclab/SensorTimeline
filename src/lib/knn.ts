@@ -9,10 +9,11 @@ export function euclideanDistance(a: number[][], b: number[][]): number {
   }
   let sum = 0;
   for (let i = 0; i < a.length; i++) {
-    if (a[i].length !== b[i].length) {
+    const alen = a[i].length;
+    if (alen !== b[i].length) {
       throw new Error("Segments must have the same number of dimensions for Euclidean distance");
     }
-    for (let j = 0; j < a[i].length; j++) {
+    for (let j = 0; j < alen; j++) {
       sum += Math.pow(a[i][j] - b[i][j], 2);
     }
   }

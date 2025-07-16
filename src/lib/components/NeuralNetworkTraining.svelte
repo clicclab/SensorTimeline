@@ -38,7 +38,7 @@
 
   // Placeholder for neural network parameters
   let epochs = $state(30);
-  let learningRate = $state(0.002);
+  let learningRate = $state(0.0015);
   let hiddenUnits = $state(16);
 
   // Placeholder for training state
@@ -166,8 +166,11 @@
             dist[i][j] = dist[j][i] = d;
           }
         }
-        const { mdsClassic } = await import("$lib/mds");
-        ({ points: mdsPoints } = mdsClassic(dist, 2));
+
+        if(mdsPoints.length < 2) {
+          const { mdsClassic } = await import("$lib/mds");
+          ({ points: mdsPoints } = mdsClassic(dist, 2));
+        }
       }
       // Compute predicted labels for each training point
       if (nnModel && labeledSegments.length > 0) {
