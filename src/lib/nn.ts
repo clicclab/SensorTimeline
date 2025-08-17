@@ -125,40 +125,56 @@ export async function trainNNClassifier(
 
     // Create a simple sequential model
     const model = tf.sequential();
-    model.add(tf.layers.lstm({
-      units: hiddenUnits,
-      inputShape: [50, inputs],
-      returnSequences: false
+    model.add(tf.layers.inputLayer({ inputShape: [50, inputs] }));
+    model.add(tf.layers.conv1d({
+      filters: hiddenUnits,
+      kernelSize: 5,
+      strides: 1,
+      activation: 'relu',
+      padding: 'same'
     }));
-    model.add(tf.layers.dense({
-      units: hiddenUnits * 2,
-      activation: 'relu'
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+    model.add(tf.layers.conv1d({
+      filters: hiddenUnits * 2,
+      kernelSize: 3,
+      strides: 1,
+      activation: 'relu',
+      padding: 'same'
     }));
-    model.add(tf.layers.dense({
-      units: hiddenUnits,
-      activation: 'relu'
-    }));
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+    model.add(tf.layers.globalAveragePooling1d());
     model.add(tf.layers.dense({
       units: uniqueLabels.length,
       activation: 'softmax'
     }));
 
+    const initialLearningRate = learningRate; // Start with a higher learning rate
+    const decayRate = 0.9; // Decay factor per epoch (adjust as needed)
+    const optimizer = tf.train.adam(initialLearningRate);
     model.compile({
-      optimizer: tf.train.adam(learningRate * 0.5),
+      optimizer,
       loss: 'categoricalCrossentropy',
       metrics: ['accuracy']
     });
 
     const batchSize = Math.min(8, augmentedSamples.length);
+    const lrScheduleCallback = {
+      onEpochEnd: (epoch: number, logs?: tf.Logs) => {
+        // Exponential decay: lr = initial_lr * decayRate^epoch
+        const newLr = initialLearningRate * Math.pow(decayRate, epoch + 1);
+        // @ts-ignore: learningRate is public but not in type
+        optimizer.learningRate = newLr;
+        if (onEpochEnd && logs && typeof logs.loss === 'number') onEpochEnd(epoch, { loss: logs.loss });
+      }
+    };
+
     const history = await model.fit(xs, ys, {
       epochs,
       batchSize,
       shuffle: true,
       verbose: 1,
       yieldEvery: "epoch",
-      callbacks: {
-        onEpochEnd
-      }
+      callbacks: [lrScheduleCallback]
     });
 
     xs.dispose();
