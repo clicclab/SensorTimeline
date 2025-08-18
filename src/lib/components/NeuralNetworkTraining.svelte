@@ -37,8 +37,8 @@
   let labels: string[] = $state([]);
 
   // Placeholder for neural network parameters
-  let epochs = $state(20);
-  let learningRate = $state(0.0075);
+  let epochs = $state(25);
+  let learningRate = $state(0.01);
   let hiddenUnits = $state(16);
 
   // Placeholder for training state

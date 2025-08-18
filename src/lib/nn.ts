@@ -125,24 +125,34 @@ export async function trainNNClassifier(
 
     // Create a simple sequential model
     const model = tf.sequential();
-    model.add(tf.layers.inputLayer({ inputShape: [50, inputs] }));
-    model.add(tf.layers.conv1d({
+    // reshape to [timesteps, features, channels]
+    model.add(tf.layers.reshape({ targetShape: [50, inputs, 1], inputShape: [50, inputs] }));
+
+    // First conv: look across multiple timesteps and the entire input feature width
+    model.add(tf.layers.conv2d({
       filters: hiddenUnits,
-      kernelSize: 5,
-      strides: 1,
+      kernelSize: [7, inputs],
+      strides: [1, 1],
       activation: 'relu',
       padding: 'same'
     }));
-    model.add(tf.layers.dropout({ rate: 0.2 }));
-    model.add(tf.layers.conv1d({
+    model.add(tf.layers.dropout({ rate: 0.25 }));
+
+    // Collapse the feature axis by pooling
+    model.add(tf.layers.maxPooling2d({ poolSize: [1, inputs], strides: [1, inputs] }));
+
+    // Second conv: operate along time on the collapsed width (width should now be 1)
+    model.add(tf.layers.conv2d({
       filters: hiddenUnits * 2,
-      kernelSize: 3,
-      strides: 1,
+      kernelSize: [3, 1],
+      strides: [1, 1],
       activation: 'relu',
       padding: 'same'
     }));
-    model.add(tf.layers.dropout({ rate: 0.2 }));
-    model.add(tf.layers.globalAveragePooling1d());
+    model.add(tf.layers.dropout({ rate: 0.25 }));
+
+    // Pool and classify
+    model.add(tf.layers.globalAveragePooling2d({}));
     model.add(tf.layers.dense({
       units: uniqueLabels.length,
       activation: 'softmax'
